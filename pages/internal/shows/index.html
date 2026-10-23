@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HALZZWALL — Shows</title>
+  <link rel="stylesheet" type="text/css" href="/assets/css/global.css"/>
+  <link rel="stylesheet" href="/assets/css/imports.css"/>
+  <link rel="stylesheet" type="text/css" href="/assets/css/vars.css"/>
+  <link rel="stylesheet" type="text/css" href="/assets/css/pages/internalBase.css"/>
+  <link rel="icon" type="icon/x-icon" href="/assets/imgs/logo.png"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+
+    body {
+      background:#000;color:#fff;
+      font-family:'Inter','Segoe UI',sans-serif;
+      height:100vh;display:flex;flex-direction:column;overflow:hidden;
+    }
+
+    /* ── TOP BAR ── */
+    .shows-topbar {
+      display:flex;align-items:center;gap:12px;
+      padding:10px 16px;
+      background:rgba(10,10,10,0.97);
+      border-bottom:1px solid rgba(155,0,255,0.25);
+      flex-shrink:0;
+    }
+    .wordmark{font-size:18px;font-weight:900;letter-spacing:-.5px;user-select:none}
+    .wordmark .w1{color:#fff} .wordmark .w2{color:rgb(155,0,255)}
+    .shows-badge{
+      font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;
+      color:rgba(155,0,255,.8);padding:3px 8px;
+      border:1px solid rgba(155,0,255,.35);border-radius:3px;
+    }
+    .search-wrap{
+      flex:1;display:flex;align-items:center;gap:8px;
+      background:rgba(20,20,20,.9);border:1px solid rgba(155,0,255,.25);
+      border-radius:6px;padding:6px 12px;max-width:480px;margin:0 auto;
+    }
+    .search-wrap input{background:transparent;border:none;outline:none;color:#fff;font-size:13px;width:100%}
+    .search-wrap input::placeholder{color:rgba(255,255,255,.3)}
+
+    /* ── MAIN LAYOUT ── */
+    .shows-body{flex:1;display:grid;grid-template-columns:220px 1fr;overflow:hidden}
+
+    /* ── SIDEBAR ── */
+    .sidebar{
+      background:rgba(8,8,8,.98);border-right:1px solid rgba(155,0,255,.18);
+      overflow-y:auto;display:flex;flex-direction:column;
+    }
+    .sidebar::-webkit-scrollbar{width:4px}
+    .sidebar::-webkit-scrollbar-track{background:transparent}
+    .sidebar::-webkit-scrollbar-thumb{background:rgba(155,0,255,.3);border-radius:2px}
+
+    .show-card{
+      display:flex;align-items:center;gap:10px;padding:14px 16px;
+      cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);
+      transition:all .15s;position:relative;
+    }
+    .show-card:hover{background:rgba(155,0,255,.1)}
+    .show-card.active{background:rgba(155,0,255,.18);border-right:3px solid rgb(155,0,255)}
+    .show-emoji{font-size:22px;flex-shrink:0}
+    .show-name{font-size:13px;font-weight:600;color:rgba(255,255,255,.85)}
+    .show-eps{font-size:11px;color:rgba(155,0,255,.7);margin-top:2px}
+
+    /* ── CONTENT AREA ── */
+    .content-area{display:flex;flex-direction:column;overflow:hidden}
+
+    /* Player */
+    .player-section{
+      flex-shrink:0;position:relative;
+      background:#000;
+    }
+    iframe#ep-player{
+      width:100%;height:320px;border:none;display:none;
+    }
+    .player-placeholder{
+      width:100%;height:320px;display:flex;align-items:center;
+      justify-content:center;flex-direction:column;gap:8px;
+      background:linear-gradient(180deg,rgba(10,0,20,0.95) 0%,#000 100%);
+      border-bottom:1px solid rgba(155,0,255,.15);
+    }
+    .player-placeholder-icon{font-size:40px;opacity:.3}
+    .player-placeholder-txt{font-size:13px;color:rgba(255,255,255,.25);letter-spacing:1px}
+    .player-info{
+      padding:10px 16px;background:rgba(10,0,20,.9);
+      border-bottom:1px solid rgba(155,0,255,.12);display:none;
+    }
+    .player-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:rgb(155,0,255)}
+    .player-title{font-size:15px;font-weight:700;margin-top:3px}
+    .player-meta{font-size:11px;color:rgba(255,255,255,.35);margin-top:2px}
+
+    /* Season + Episode list */
+    .episodes-section{flex:1;overflow-y:auto;padding:12px}
+    .episodes-section::-webkit-scrollbar{width:4px}
+    .episodes-section::-webkit-scrollbar-thumb{background:rgba(155,0,255,.25);border-radius:2px}
+
+    .season-header{
+      display:flex;align-items:center;gap:10px;
+      padding:10px 0 8px;margin-top:8px;
+      border-bottom:1px solid rgba(155,0,255,.15);
+      cursor:pointer;user-select:none;
+    }
+    .season-header:first-child{margin-top:0}
+    .season-arrow{
+      font-size:10px;color:rgba(155,0,255,.7);
+      transition:transform .2s;flex-shrink:0;
+    }
+    .season-header.collapsed .season-arrow{transform:rotate(-90deg)}
+    .season-label{font-size:12px;font-weight:700;letter-spacing:.5px;color:rgba(255,255,255,.7)}
+    .season-count{font-size:11px;color:rgba(155,0,255,.6);margin-left:auto;flex-shrink:0}
+
+    .season-eps{overflow:hidden;transition:max-height .25s ease}
+    .season-eps.collapsed{max-height:0!important}
+
+    .ep-item{
+      display:grid;grid-template-columns:42px 1fr 60px;
+      align-items:center;gap:10px;
+      padding:8px 8px;margin:2px 0;border-radius:6px;
+      cursor:pointer;transition:background .15s;
+    }
+    .ep-item:hover{background:rgba(155,0,255,.1)}
+    .ep-item.playing{background:rgba(155,0,255,.2);border:1px solid rgba(155,0,255,.4)}
+    .ep-num{
+      font-size:11px;font-weight:700;color:rgba(155,0,255,.6);
+      text-align:center;font-variant-numeric:tabular-nums;
+    }
+    .ep-title{font-size:12px;color:rgba(255,255,255,.8);line-height:1.3}
+    .ep-badge{
+      font-size:10px;font-weight:700;text-align:right;
+      color:rgba(155,0,255,.5);
+    }
+    .ep-item.playing .ep-badge{color:rgb(155,0,255)}
+
+    /* ZIP download item */
+    .zip-item{
+      display:flex;align-items:center;gap:12px;
+      padding:12px 10px;margin:4px 0;border-radius:6px;
+      background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);
+      cursor:pointer;transition:all .2s;
+    }
+    .zip-item:hover{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4)}
+    .zip-icon{font-size:20px;flex-shrink:0}
+    .zip-label{font-size:12px;color:rgba(245,158,11,.9);font-weight:600}
+    .zip-sub{font-size:11px;color:rgba(255,255,255,.35);margin-top:2px}
+    .zip-btn{
+      margin-left:auto;flex-shrink:0;
+      background:rgba(245,158,11,.2);border:1px solid rgba(245,158,11,.4);
+      color:rgb(245,158,11);padding:5px 12px;border-radius:4px;
+      font-size:11px;font-weight:700;cursor:pointer;
+    }
+
+    /* Empty state */
+    .empty-state{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      height:100%;gap:12px;color:rgba(255,255,255,.2);
+    }
+    .empty-icon{font-size:48px;opacity:.3}
+    .empty-txt{font-size:13px;letter-spacing:1px}
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div class="shows-topbar">
+    <div class="wordmark"><span class="w1">halzz</span><span class="w2">wall</span></div>
+    <div class="shows-badge">SHOWS</div>
+    <div class="search-wrap">
+      <svg width="13" height="13" viewBox="0 0 18 18" fill="none">
+        <path fill="#fff" d="M7.132 0C3.197 0 0 3.124 0 6.97c0 3.844 3.197 6.969 7.132 6.969 1.557 0 2.995-.49 4.169-1.32L16.82 18 18 16.847l-5.454-5.342a6.846 6.846 0 0 0 1.718-4.536C14.264 3.124 11.067 0 7.132 0zm0 .82c3.48 0 6.293 2.748 6.293 6.15 0 3.4-2.813 6.149-6.293 6.149S.839 10.37.839 6.969C.839 3.568 3.651.82 7.132.82z"/>
+      </svg>
+      <input id="epSearch" type="text" placeholder="Filter episodes..." autocomplete="off"/>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="shows-body">
+
+    <!-- Sidebar: show list -->
+    <div class="sidebar" id="sidebar"></div>
+
+    <!-- Content: player + episodes -->
+    <div class="content-area">
+      <div class="player-section">
+        <iframe id="ep-player" allowfullscreen allow="autoplay; fullscreen"></iframe>
+        <div class="player-placeholder" id="player-placeholder">
+          <div class="player-placeholder-icon">📺</div>
+          <div class="player-placeholder-txt">SELECT AN EPISODE</div>
+        </div>
+        <div class="player-info" id="player-info">
+          <div class="player-label" id="player-label"></div>
+          <div class="player-title" id="player-title"></div>
+          <div class="player-meta" id="player-meta"></div>
+        </div>
+      </div>
+      <div class="episodes-section" id="episodes-section">
+        <div class="empty-state">
+          <div class="empty-icon">🎬</div>
+          <div class="empty-txt">CHOOSE A SHOW</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/assets/js/lib/localforage/localforage.min.js"></script>
+  <script src="/assets/js/lib/wisp-client-js/wisp-client.js"></script>
+  <script src="/assets/js/lib/Nightmare/nightmare.js"></script>
+  <script src="/assets/js/apis/events.js"></script>
+  <script src="/assets/js/apis/logging.js"></script>
+  <script src="/assets/js/apis/settings.js"></script>
+  <script src="/baremux/index.js"></script>
+  <script src="/@/uv.bundle.js"></script>
+  <script src="/@/uv.config.js"></script>
+  <script src="/$/scramjet.config.js"></script>
+  <script src="/$/scramjet.all.js"></script>
+  <script src="/!/meteor.codecs.js"></script>
+  <script src="/!/meteor.config.js"></script>
+  <script src="/!/meteor.bundle.js"></script>
+  <script src="/e/eclipse.codecs.js"></script>
+  <script src="/e/eclipse.config.js"></script>
+  <script src="/&/sandstone.js"></script>
+  <script src="/assets/js/apis/proxy.js"></script>
+  <script src="/assets/js/global/theming.js"></script>
+  <script src="/assets/js/global/index.js"></script>
+
+  <script>
+  /* ── CATALOG ── */
+  const SHOWS = [
+    {
+      id: 'south-park', name: 'South Park', emoji: '🏔️',
+      seasons: [
+        { label:'Season 0 — The Shorts', fid:'1KbC0R2_YHUz1IZYYRPUHDqmVg3ZftKOF', episodes:[
+          {gdid:'1TJBWVSw9EkUVHjb5X2ffiRVRlyyczD4S',raw:'South Park S00E01 The Spirit Of Christmas (1992).mp4'},
+          {gdid:'1p1PduPksnxc_XeclFp1JbDF8xGNnz3qj',raw:'South Park S00E02 The Spirit Of Christmas (1995).mp4'},
+          {gdid:'1FVNahLo_a8J6zj2QkBUmmhC6_xxXv6CU',raw:'South Park S00E03 Cartman Gets An Anal Probe.mp4'},
+        ]},
+        { label:'Season 1', fid:'1t-xcp9Z6gRwp68D9UT61sUnBmtHtgISq', episodes:[
+          {gdid:'1-7TqzdAGn1FO5joePeF5mcY6pODy62Wz',raw:'S01E01 Cartman Gets an Anal Probe (Remaster).mp4'},
+          {gdid:'1f_OyXnvb88Lj1HdG6Zv3M_CG2M9Q0CxR',raw:'S01E02 Weight Gain 4000.mp4'},
+          {gdid:'1geH9ADUrQnU9H5jbBnTUH8EDtLcm9REl',raw:'S01E03 Volcano.mp4'},
+          {gdid:'1OPP6REscSZ8LMhih0q1GnS5hsM6iNcHt',raw:"S01E04 Big Gay Al's Big Gay Boat Ride.mp4"},
+          {gdid:'166KPUjWdz_SAmJ2RDO4R9OKVlLGpJtxc',raw:'S01E05 An Elephant Makes Love to a Pig.mp4'},
+          {gdid:'1nQggnbNnhwN_yT83_z_YG3Ydu8Hvw4Sr',raw:'S01E06 Death.mp4'},
+          {gdid:'1TSTtksANmYcDC0kK2QfaUa9iCd9ZtVCt',raw:'S01E07 Pinkeye.mp4'},
+          {gdid:'1A3XDZd5XdaAbM3hZoT-SMpELRKnC6pLn',raw:'S01E08 Damien.mp4'},
+          {gdid:'1Ib2ZU4uhbhMlvvGI0R4QpVD7pALgfd_0',raw:"S01E09 Starvin' Marvin.mp4"},
+          {gdid:'1Ps18F_A7a6UnAm_tyML999earAYN705z',raw:'S01E10 Mr. Hankey the Christmas Poo.mp4'},
+          {gdid:'1T1kx_szPUD7nfjhNX0MtAW0md2Uk5HQI',raw:"S01E11 Tom's Rhinoplasty.mp4"},
+          {gdid:'1wBEFrWOIhvoNQGwoIheGFmuVOt2nEQJy',raw:'S01E12 Mecha-Streisand.mp4'},
+          {gdid:'1JGELk_MN3b-hOfb4sy3p3f20TECI_knM',raw:"S01E13 Cartman's Mom Is a Dirty Slut.mp4"},
+        ]},
+        { label:'Season 2 — 📦 ZIP', fid:'1Mp3Ej6LKWslU8dfRqstlf8pE47UMr6SF', zip:true, episodes:[]},
+        { label:'Season 3', fid:'1fG4cjgOeBZ4xfBYOJiHpK8o5BOTZZen9', episodes:[
+          {gdid:'1DXlOxBbIWjyS5vNTLJu0n5yENoncN8aY',raw:'S03E01 Rain Forest Schmain Forest.mp4'},
+          {gdid:'1b1hHGZUajY_pg-5uxuEQkw_VE2PEemvj',raw:'S03E02 Spontaneous Combustion.mp4'},
+          {gdid:'1gpeu0JdyYyS6oLOQ4GCP-6ocNzQM2R9j',raw:'S03E03 The Succubus.mp4'},
+          {gdid:'1KegslY-244CPiMxDQqV31BsCG0SY5Z5K',raw:'S03E04 Tweek vs. Craig.mp4'},
+          {gdid:'1AfLiaFfIztfihc6HJxTgy57oSxSOytkz',raw:'S03E05 Jakovasaurs.mp4'},
+          {gdid:'179uzB6UQdu0lXC04j_O9VMEY4nCJzwMe',raw:'S03E06 Sexual Harassment Panda.mp4'},
+          {gdid:'14XIMq5DqHG9sc3wYJk_QDUnJnc3uibQL',raw:'S03E07 Cat Orgy.mp4'},
+          {gdid:'1e14KuPUZvJZkcELeZzjb7-WaQNqc9Thd',raw:'S03E08 Two Guys Naked in a Hot Tub.mp4'},
+          {gdid:'1Vb3HAgDUMVRmosFNm1BN32U7ZAvjL__F',raw:'S03E09 Jewbilee.mp4'},
+          {gdid:'1DhpFi08d7TcfE5-tXY_-gu4OgC1kLroc',raw:'S03E10 Chinpokomon.mp4'},
+          {gdid:'130WhAEMZnJj7TyynyYrcU_hLXNflw_Qz',raw:"S03E11 Starvin' Marvin in Space.mp4"},
+          {gdid:'1OkKza-lrVlqYyV3Nhi1ALPMe7wswdh_k',raw:"S03E12 Korn's Groovy Pirate Ghost Mystery.mp4"},
+          {gdid:'1_suqgUoJPWfCh0NQBBIxoT-dZkkyxLyV',raw:'S03E13 Hooked on Monkey Fonics.mp4'},
+          {gdid:'1k8y4qGV9i4buKL7LjESUtf4s7TnjuJQt',raw:'S03E14 The Red Badge of Gayness.mp4'},
+          {gdid:'1F7Du5L4t64KNpG6HIhvotOkzop2wnyFA',raw:"S03E15 Mr. Hankey's Christmas Classics.mp4"},
+          {gdid:'1B1A0SmVuSMDbMY9YSjjR98JKtJuOB_2b',raw:"S03E16 Are You There God? It's Me, Jesus.mp4"},
+          {gdid:'10PjhKdbbiTJ0qzQFKUYYfGg7eoKv6dYv',raw:'S03E17 World Wide Recorder Concert.mp4'},
+        ]},
+        { label:'Season 4', fid:'1KaRRWryGy8IqONb7mfiCuUerwtBzd5Dq', episodes:[
+          {gdid:'10kS4XviX80YhMuCgUA3Hmb7BhM5lHCv_',raw:"S04E01 Cartman's Silly Hate Crime 2000.mp4"},
+          {gdid:'1TRvpDJrFVGhOwWTjRbQLPAetyQWm7a1Y',raw:"S04E02 The Tooth Fairy's Tats 2000.mp4"},
+          {gdid:'1-1ItPMqMaIH-GgXmfjlJ_rhWhP_NaTi2',raw:'S04E03 Quintuplets 2000.mp4'},
+          {gdid:'1Ttz6ZWF6LxZZFWKG7E8rpfrUAYeTuvzm',raw:'S04E04 Timmy 2000.mp4'},
+          {gdid:'1AztGLs8OGg8MMxFbut2ts0mMuRzxIE2e',raw:'S04E05 Pip.mp4'},
+          {gdid:'1WNIQQWD0hKJ72WxXsOuKFo2RZxcBFs_4',raw:'S04E06 Cartman Joins NAMBLA.mp4'},
+          {gdid:'1wcgz54kBr8X2W41J88WYsNtDKayZE2IF',raw:'S04E07 Cherokee Hair Tampons.mp4'},
+          {gdid:'1yUWSkH5yswLoZ8eTCeO2jB_Ofnkbh2EW',raw:'S04E08 Chef Goes Nanners.mp4'},
+          {gdid:'1MEhUHV1cCWLkFo87gH4hGNcmaF8-K-HQ',raw:'S04E09 Something You Can Do with Your Finger.mp4'},
+          {gdid:'1q1uUsj0P7DqSJyNy9VRDB-6HV5nfC69X',raw:'S04E10 Do the Handicapped Go to Hell?.mp4'},
+          {gdid:'19alHsxlCNjZMyOfTo7PpGFTOxvZ1zLwO',raw:'S04E11 Probably.mp4'},
+          {gdid:'1rVF1Lu9GUe8ehLrg0s1oPqF6RS55gjm5',raw:'S04E12 4th Grade.mp4'},
+          {gdid:'1ff6RTqZBBEpRWN1Ygk7gaevGfZFTZ7AW',raw:'S04E13 Trapper Keeper.mp4'},
+          {gdid:'1BAvqadysj7Zy_CPzjGji938ySmwzhL9D',raw:'S04E14 Helen Keller! The Musical.mp4'},
+          {gdid:'1HmSQXfEv1mySf3Tv0k9RdYGSit517MFg',raw:'S04E15 Fat Camp.mp4'},
+          {gdid:'1vgRIjPH7qisQ5vF2ifPeYP0PEsBoU8Mr',raw:'S04E16 The Wacky Molestation Adventure.mp4'},
+          {gdid:'1XQaSmFIR2rLkBXU4bQMAq5EivdZhEN1B',raw:'S04E17 A Very Crappy Christmas.mp4'},
+        ]},
+        { label:'Season 5', fid:'1mx0BahXVJH4-vaPtg7pTCje4MO2ZOupx', episodes:[
+          {gdid:'1YO157F2R_-gSrWmslvsdE3uPZpXD6WG6',raw:'S05E01 It Hits the Fan.mp4'},
+          {gdid:'14LMqSZbYDqqwPMOi1qbWZ6XiccCJiW06',raw:'S05E02 Cripple Fight.mp4'},
+          {gdid:'1oJhhq4Wlf1ofHsw3fuqrbwtMzFTW6E2C',raw:'S05E03 Super Best Friends.mp4'},
+          {gdid:'1w1A7EZHsHcyvhVINks5Qjhm0_MwRFY7C',raw:'S05E04 Scott Tenorman Must Die.mp4'},
+          {gdid:'1XZmuSrngkOtKawoOljkQoJAFb4jxqeQL',raw:'S05E05 Terrance and Phillip Behind the Blow.mp4'},
+          {gdid:'1EybjnFDk49cXeMl1WxDZLWE1IEer_7yw',raw:'S05E06 Cartmanland.mp4'},
+          {gdid:'1OhhLZX88pJC47iLdKpy0FkKxZL8VgY39',raw:'S05E07 Proper Condom Use.mp4'},
+          {gdid:'1hePQsA1gJGqFfqCuzIAfWeDJ3LGG1hfv',raw:'S05E08 Towelie.mp4'},
+          {gdid:'1LXkzLhYE4lDxa2860NyWoTjgI87ybygF',raw:'S05E09 Osama Bin Laden Has Farty Pants.mp4'},
+          {gdid:'1ixABV2sZXG00K4EkuvpubCSnK2fScLFy',raw:'S05E10 How to Eat with Your Butt.mp4'},
+          {gdid:'1mjkmVaDIJ2EPzNbUvRlRklsgubpREWYO',raw:'S05E11 The Entity.mp4'},
+          {gdid:'1h8hlHJnQgt7BuVsHIh4WHkMibouAeH1A',raw:'S05E12 Here Comes the Neighborhood.mp4'},
+          {gdid:'12To2s7OEnBoHoxYCjRiYljGh866LF9_B',raw:'S05E13 Kenny Dies.mp4'},
+          {gdid:'13mxKKzXXZv7bjp2YGAEPS-QrvD2fMkQP',raw:"S05E14 Butters' Very Own Episode.mp4"},
+        ]},
+        { label:'Season 6 — 📦 ZIP', fid:'1VQnlUUPD_58KxndfieLcyqiQ7S59srZq', zip:true, episodes:[]},
+        { label:'Season 7 — 📦 ZIP', fid:'1ZQwNQxDw7FG6E-3Ib2eNYbosmGWoprv2', zip:true, episodes:[]},
+        { label:'Season 8 — 📦 ZIP', fid:'1IN8_YgKD1dYXmZHglJgfJhrr_9mQqU7k', zip:true, episodes:[]},
+        { label:'Season 9 — 📦 ZIP', fid:'1jqWVMHCEajoYAp6WNdnI3WaVrMsiG-J2', zip:true, episodes:[]},
+        { label:'Season 10 — 📦 ZIP', fid:'1OmzZ-EB66A-QRckS7GVyOFotdd2lN1MR', zip:true, episodes:[]},
+        { label:'Season 11 — 📦 ZIP', fid:'12XYgQcsLIvOpt_CeVHfxl5fr9FENKoJH', zip:true, episodes:[]},
+        { label:'Season 12', fid:'1yVfS6jUI_B8SZk_pyZ6D__0agQPxYit9', episodes:[
+          {gdid:'1pt_uiEET96lzwD67xQdBy1DIBrz1JUUm',raw:'South Park S12E01 Tonsil Trouble.mp4'},
+        ]},
+        { label:'Season 13 — 📦 ZIP', fid:'1qosLW2lm2e8MBmvViM70FHGoPYGsUqbo', zip:true, episodes:[]},
+        { label:'Season 14', fid:'1tCSeWAGoBGfN7lOEPkotpyZtYLLo6ZjY', episodes:[
+          {gdid:'1ybSI0YIBer4KhgqMW_uNHhrnlb27y_zz',raw:'South.Park.S14E01.Sexual.Healing.mkv'},
+          {gdid:'1jFroCAxVK5BiU7yZDSIVJXREdSggdeX-',raw:'South.Park.S14E02.The.Tale.of.Scrotie.McBoogerballs.mkv'},
+          {gdid:'1d2TdHifGcwPyY7vYq46-7T9QatfmO_sQ',raw:'South.Park.S14E03.Medicinal.Fried.Chicken.mkv'},
+          {gdid:'1RGXBbaFymze57lTyBzdmn8E17SavV2MP',raw:'South.Park.S14E04.You.Have.0.Friends.mkv'},
+          {gdid:'1k4LEwHc6bRKXqqADkYXXiyvomL364fe5',raw:'South.Park.S14E05.200.mkv'},
+          {gdid:'1UQftkhsqnF5jiUC3RX_mJ-VsCK4mgSLd',raw:'South.Park.S14E06.201.mkv'},
+          {gdid:'15Jc8mdeGZHHShOMGVtH5VzA-sDOUqas-',raw:'South.Park.S14E07.Crippled.Summer.mkv'},
+          {gdid:'1te7P7DYCadV-1adeTSxPvGYEH3t0RyON',raw:'South.Park.S14E08.Poor.and.Stupid.mkv'},
+          {gdid:'16IZ88uu6ra8ShAboFwumSfvJSTdJ6j-w',raw:'South.Park.S14E09.Its.a.Jersey.Thing.mkv'},
+          {gdid:'1vWi2MUnhkOYDHCmo1-MFv4071_d-r-hU',raw:'South.Park.S14E10.Insheeption.mkv'},
+          {gdid:'1_UGy78I4T9myXe0C42RzuYmxYYhzX_TQ',raw:'South.Park.S14E11.Coon.2.Hindsight.mkv'},
+          {gdid:'14RdgIYSY-8UFwJo9mrKYdUk4klBg135q',raw:'South.Park.S14E12.Mysterion.Rises.mkv'},
+          {gdid:'1FUpKYhbj5-4eZV9RcdcGbIYv3l6ccNF6',raw:'South.Park.S14E13.Coon.vs.Coon.and.Friends.mkv'},
+          {gdid:'1lfnXFu_t62m7k95tVyo6Lfi5nHA3yA-P',raw:'South.Park.S14E14.Creme.Fraiche.mkv'},
+        ]},
+        { label:'Season 15', fid:'1EVzdNOJcnG3aOVVgxryJ4LkqwwUHvAzl', episodes:[
+          {gdid:'16GJwrNWnVBNoaP8EB8Ps7Kdw2n3JoUMu',raw:'S15E01 HUMANCENTiPAD.mkv'},
+          {gdid:'1ZKfbAg-v6IsT_yyaZIcPOnDcSmPfXCXt',raw:'S15E02 Funnybot.mkv'},
+          {gdid:'1XMi_jV4eMg03GgzFCpGTdfECRfLikK0s',raw:'S15E03 Royal Pudding.mkv'},
+          {gdid:'1-563ry_yBO_gFpGKpz78imlSe88yEjQG',raw:'S15E04 Crack Baby Athletic Association.mkv'},
+          {gdid:'1IQ-2x8-Ju4CKF61IliXZk4FQrzQ5pPJ2',raw:'S15E05 Jewpacabra.mkv'},
+          {gdid:'1q_WfyAKAx_4JB9CwVQCZrzAnlFMRqal6',raw:'S15E06 City Sushi.mkv'},
+          {gdid:'1M-s_TX8mbIskYXX8_9gNbpN2Qq0CatlH',raw:"S15E07 You're Getting Old.mkv"},
+          {gdid:'1M1dE9GSCNRrpw-DteYSqoDXb_zsjPkWv',raw:'S15E08 Ass Burgers.mkv'},
+          {gdid:'1Z4yKfEQ4QOcDSNJVcE_2jd-NRq8SRgcH',raw:'S15E09 The Last of the Meheecans.mkv'},
+          {gdid:'1aher6yRcud73mZra6Xo9gYIZWc0jDTl5',raw:'S15E10 Bass to Mouth.mkv'},
+          {gdid:'1UbNiH0veOgvupkVisnWUF4e7K7zhcOCM',raw:'S15E11 Broadway Bro Down.mkv'},
+          {gdid:'1sq3DKyo9yHBGWXBEomkEFzG53qGX4TMH',raw:'S15E12 1%.mkv'},
+          {gdid:'1bZT8TM6uvl_7nf-O-Th8_-Nnh8jE2f9L',raw:'S15E13 A History Channel Thanksgiving.mkv'},
+          {gdid:'1Wawi9PTJjsnjcfxt_4PuPUMlgwGhNohd',raw:'S15E14 The Poor Kid.mkv'},
+        ]},
+        { label:'Season 16', fid:'12idjO5Cl08prgludSOQAoKB1crj2qvbm', episodes:[
+          {gdid:'1g13UkzbmNTk5mQ41R4Q3NPk2VWyI36wA',raw:'South.Park.S16E01.Reverse.Cowgirl.mkv'},
+          {gdid:'1UvOrWqi-jf-IOnEc6QYzBzaI_lfFqnPR',raw:'South.Park.S16E02.Cash.for.Gold.mkv'},
+          {gdid:'1NOVKw4OX6HpnY2KtI1d672AWaDFyM_AQ',raw:'South.Park.S16E03.Faith.Hilling.mkv'},
+          {gdid:'181fNNtxLugHOcuFTV2knyIKNHg6AFJAa',raw:'South.Park.S16E04.Jewpacabra.mkv'},
+          {gdid:'1NQKxIbvVYl3iya89i1USmgTGHLLXVof9',raw:'South.Park.S16E05.Butterballs.mkv'},
+          {gdid:'1Y65FBfnopNRlFeMyYw3bCc1nYVVIGKGZ',raw:'South.Park.S16E06.I.Should.Have.Never.Gone.Ziplining.mkv'},
+          {gdid:'1NKspjHfgFmGHsUzi_I2pTmLyfMfoSgT4',raw:'South.Park.S16E07.Girls.Nite.Out.mkv'},
+          {gdid:'1PnMwmAUslCqw4n9dBn_5-ikMcIBISedq',raw:'South.Park.S16E08.Sarcastaball.mkv'},
+          {gdid:'1G4OCN20opQVxBjFZCBapu-JyxcUyq5xr',raw:'South.Park.S16E09.Raising.the.Bar.mkv'},
+          {gdid:'1fNfCD_g438boIyZBzJ76om-Kg85fSfS9',raw:'South.Park.S16E10.Insecurity.mkv'},
+          {gdid:'1uuTL0fJT6MFBdyGYi_IUZx77JWwl2c9h',raw:'South.Park.S16E11.Going.Native.mkv'},
+          {gdid:'1e0ycyQWO-WusTsdPPBeck85xpeEcYMN6',raw:'South.Park.S16E12.A.Nightmare.on.Face.Time.mkv'},
+          {gdid:'1_fKIhu5QKOlmhOYVNjz35tvrd-DnQ5kv',raw:'South.Park.S16E13.A.Scause.for.Applause.mkv'},
+          {gdid:'1KFWwEWSUeKtL5JvTF6mqHDZTkug9tlIp',raw:'South.Park.S16E14.Obama.Wins.mkv'},
+        ]},
+        { label:'Season 17', fid:'1eVeogFeuTkqsQ_JgROzjBqEL930c-3kh', episodes:[
+          {gdid:'1sDUBwm38USNm7IMtBOCN7RU-OezxHUZG',raw:'South.Park.S17E01.mkv'},
+          {gdid:'1EPoQtfr9YLrTsde-AIW1_sAWBbttIiBk',raw:'South.Park.S17E02.mkv'},
+          {gdid:'1XDm0RVyl3XvhBKgzQ_nDG5QRAzYf8OU0',raw:'South.Park.S17E03.mkv'},
+          {gdid:'1LFtQEWvktEn2dFDCvk1nQ0C2vBw7Ds0L',raw:'South.Park.S17E04.mkv'},
+          {gdid:'1k-lO46zZoiHuYWHg6umsCkMTlHeZ2m8E',raw:'South.Park.S17E05.mkv'},
+          {gdid:'1P8FqgVOZMeFBJlLqno4SiE4R0QDtqwQF',raw:'South.Park.S17E06.mkv'},
+          {gdid:'1TSt_owRvoVjRqiGAkHkiVarH_7Qt_p8L',raw:'South.Park.S17E07.mkv'},
+          {gdid:'1pQpQHWZHsKAxqCZDGwn-g43HR6ElASuP',raw:'South.Park.S17E08.mkv'},
+          {gdid:'1TtqKWwW4K-LTS8wxWLHBjBYYkS-0lu6y',raw:'South.Park.S17E09.mkv'},
+          {gdid:'1t0fMcEwjbuIDNtMXGkJC7Ix-VA1E989Z',raw:'South Park S17E10 The Hobbit.mp4'},
+        ]},
+        { label:'Season 18', fid:'1C-ZK-f1DxToQtCoV0O78HuuoTdhkmA_D', episodes:[
+          {gdid:'16EuOBmQg1Ymn6hwCoz5APNyWRxC7IYw_',raw:'South.Park.S18E01.Go.Fund.Yourself.mkv'},
+          {gdid:'1ZFoHG7xyHn3pqoO9ppBf4rM6rzkSzWZz',raw:'South.Park.S18E02.Gluten.Free.Ebola.mkv'},
+          {gdid:'1M2hJSMmcM_hEf7_MMItCpIi8TrhjV_q4',raw:'South.Park.S18E03.The.Cissy.mkv'},
+          {gdid:'1JP2435Ns9NLjJzlPvlj_CphpNScH45T0',raw:'South.Park.S18E04.Handicar.mkv'},
+          {gdid:'1uACSIB3Zgm_y1uI-xFNWF1Whk51cExvi',raw:'South.Park.S18E05.The.Magic.Bush.mkv'},
+          {gdid:'16NqCy62wcPMIdnSdBSg2jGjQsy01q23Q',raw:'South.Park.S18E06.Freemium.Isnt.Free.mkv'},
+          {gdid:'1LN7rGZSYdjrRxectu6yE5DBaVTbhPGKE',raw:'South.Park.S18E07.Grounded.Vindaloop.mkv'},
+          {gdid:'1VX7atrceF2Z8_dIeu1_gHpN1Oy8AeDPU',raw:'South.Park.S18E08.Cock.Magic.mkv'},
+          {gdid:'1oACgRCbCPwMZrWLFsUDIt4zZgsc0xBOx',raw:'South.Park.S18E09.REHASH.mkv'},
+          {gdid:'1cMZ6MM1PyyoOSt7KY3tUfJWE_sLcwpBK',raw:'South.Park.S18E10.HappyHolograms.mkv'},
+        ]},
+        { label:'Season 19', fid:'1IfGCBX2S_TbpZ2iWeyFFp8lkTz5hAh2a', episodes:[
+          {gdid:'1TssM6kXsNMkuTRvd41B7U2Pn23sE5qWF',raw:'South.Park.S19E01.Stunning.and.Brave.mkv'},
+          {gdid:'1O5rn_QgGb3mWlnNcDDXs3jXwrBnpa9S9',raw:'South.Park.S19E02.Where.My.Country.Gone.mkv'},
+          {gdid:'1i8PI4GSkDH4XciNvqks9cc0y832paAhh',raw:'South.Park.S19E03.The.City.Part.of.Town.mkv'},
+          {gdid:'1YwC1Ymzt0q1DP_6yES9XucWa0iuhMZzW',raw:'South.Park.S19E04.Youre.Not.Yelping.mkv'},
+          {gdid:'1bN7a_9fyBsXaEeO0L985sSCaVRAUmUPq',raw:'South.Park.S19E05.Safe.Space.mkv'},
+          {gdid:'14SuEib8E8Bmo3HjdhoiB2z1mBCxIAMa9',raw:'South.Park.S19E06.Tweek.x.Craig.mkv'},
+          {gdid:'1OM6VTuhL6PR4D6nymQgdBgPN2c2dWmSP',raw:'South.Park.S19E07.Naughty.Ninjas.mkv'},
+          {gdid:'1afQnnu_OOGVSp07PN6Ng3PiGEM6QwxG7',raw:'South.Park.S19E08.Sponsored.Content.mkv'},
+          {gdid:'16cmz3bx76noGDk1MUnEMkRYuZewgcjOj',raw:'South.Park.S19E09.Truth.and.Advertising.mkv'},
+          {gdid:'1811klxV6XPGmsRl5Zfx2kBqT8IalIAK4',raw:'South.Park.S19E10.PC.Principal.Final.Justice.mkv'},
+        ]},
+        { label:'Season 20', fid:'1-SSbI6M6zimqOq0BrOfLrjCSK-X3APyo', episodes:[
+          {gdid:'10UnVe_O39c4BIR4Kbo_s6ZbTAf9u2qHC',raw:'South.Park.S20E01.Member.Berries.mkv'},
+          {gdid:'1MRxbvcLIxhzxGeKPuUldNLymeQJLwk7a',raw:'South.Park.S20E02.Skank.Hunt.mkv'},
+          {gdid:'1v7U-3E4dFHXrqf7XTKj3ewbFvi07Bsjf',raw:'South.Park.S20E03.The.Damned.mkv'},
+          {gdid:'12DCOyMLVxTxDDqDgjuNlECL-rP9J6rCI',raw:'South.Park.S20E04.Wieners.Out.mkv'},
+          {gdid:'14JXl9IBzBp-twnb2ImW4WnOXlBuw19vJ',raw:'South.Park.S20E05.Douche.and.a.Danish.mkv'},
+          {gdid:'1CECy2mtzklYZuGjMsFfvhworaxTPEnKl',raw:'South.Park.S20E06.Fort.Collins.mkv'},
+          {gdid:'1QFhhytrv6RgjMS1D0EyH7tsscnMgrriI',raw:'South.Park.S20E07.Oh.Jeez.mkv'},
+          {gdid:'1MjyMnRDcFDHQbGIYVCG4I7jxGAYSKgJN',raw:'South.Park.S20E08.Members.Only.mkv'},
+          {gdid:'1U5BbPjD3u7jgHoOyDJ_063joLDxY6ezS',raw:'South.Park.S20E09.Not.Funny.mkv'},
+          {gdid:'1k1YvsxGPzTD6Je1I44TdNZGzS-TrtSV2',raw:'South.Park.S20E10.The.End.of.Serialization.as.We.Know.It.mkv'},
+        ]},
+        { label:'Season 21', fid:'1AZB1ddNqmQ22rMpQmBCxsciR4zwx5x94', episodes:[
+          {gdid:'1dPLmikb4Yi_hBedcyFU4NICPBEDT78pt',raw:'South.Park.S21E01.White.People.Renovating.Houses.mkv'},
+          {gdid:'1_2ceHYwVlI4bFSId5PYroXrywkHeNNv2',raw:'South.Park.S21E02.Put.It.Down.mkv'},
+          {gdid:'1EsYM3EAg3yYS3PDqo9Io31QrVhItKr6P',raw:'South.Park.S21E03.Holiday.Special.mkv'},
+          {gdid:'1hzgXJQL-E00tNBHxsAkkfkAG6CHFEt9e',raw:'South.Park.S21E04.Franchise.Prequel.mkv'},
+          {gdid:'1Ah6YVBTpFxja2cwgrK0NPlAfxB3xOMRp',raw:'South.Park.S21E05.Hummels.and.Heroin.mkv'},
+          {gdid:'18D2GdIVnfLDPEss2h4LZemNARZZh8zLW',raw:"South.Park.S21E06.Sons.A.Witches.mkv"},
+          {gdid:'1P2RpvwA49xci1FMh8L97qVFpbe_H2_U-',raw:'South.Park.S21E07.Doubling.Down.mkv'},
+          {gdid:'1Z0zm6bhh30_uDlqUKuD9xBoZ34S_bxOP',raw:'South.Park.S21E08.Moss.Piglets.mkv'},
+          {gdid:'1NwS1ZYvVHGCU_IU_IX9DY--5K6l36Ei4',raw:'South.Park.S21E09.SUPER.HARD.PCness.mkv'},
+          {gdid:'1WYDo9wzUc2scixkw9vGiVAh6f6f24YkN',raw:'South.Park.S21E10.Splatty.Tomato.mkv'},
+        ]},
+        { label:'Season 22', fid:'1TQMo8DlRYayNc-mqoqQ193itevF1_yBt', episodes:[
+          {gdid:'10VCWdEOfvVhDOi3OgcWS9JhWP6ucg0i3',raw:'South.Park.S22E01.Dead.Kids.mkv'},
+          {gdid:'18ez7B3tL2hSbdfZLNp2kmxf7hzxzyzOd',raw:'South.Park.S22E02.A.Boy.and.a.Priest.mkv'},
+          {gdid:'1IRrfSoim5M9oIeL5VP7_DeLsjNbJ4TP7',raw:'South.Park.S22E03.The.Problem.with.a.Poo.mkv'},
+          {gdid:'1aTuOwuubtlMuQA84fJ-10iiqqsj5FM4w',raw:'South.Park.S22E04.Tegridy.Farms.mkv'},
+          {gdid:'1QWb9FMNQPTpfxy8kiZcUMa6ZNQo3eHmw',raw:'South.Park.S22E05.The.Scoots.mkv'},
+          {gdid:'1tUaqqvprvxyWokx_rc-KnQzv7n8C5-bD',raw:'South.Park.S22E06.Time.to.Get.Cereal.mkv'},
+          {gdid:'19nnsD1czZjKnHTs8Q6DlT-YgiPeQaayw',raw:'South.Park.S22E07.Nobody.Got.Cereal.mkv'},
+          {gdid:'1NNi2cilqRTkkUA-8Z_6FImr5lSB8weGQ',raw:'South.Park.S22E08.Buddha.Box.mkv'},
+          {gdid:'1MqAC-NtICZHm4wg2QRFK26E9EvESLKWV',raw:'South.Park.S22E09.Unfulfilled.mkv'},
+          {gdid:'1BlY6_7IoVIDUlQmeze9egcnk0bnf-faF',raw:'South.Park.S22E10.Bike.Parade.mkv'},
+        ]},
+        { label:'Season 23', fid:'1t8nimEsLZ77NUxR-krZM_RFS63-loUo4', episodes:[
+          {gdid:'1OoxYjCIQ7avz15pgIvpQye_mgE7o9bv_',raw:'S23E01 Mexican Joker.mp4'},
+          {gdid:'1usGclAtIf5l7t6mU59B1k6jnj2p0eOcW',raw:'S23E02 Band in China.mp4'},
+          {gdid:'1QxNwVTIis2CeiUjnS0NgZrR40_cIZlcY',raw:'S23E03 Shots!!!.mp4'},
+          {gdid:'1HyEPKwQDB8mankp8r2Kng3A6tRc28BM0',raw:'S23E04 Let Them Eat Goo.mp4'},
+          {gdid:'1lSRCe8CfWr4afNYyYeO29LWmpVa9tyif',raw:'S23E05 Tegridy Farms Halloween Special.mp4'},
+          {gdid:'1OiHo6xPACoI1LhfIIDcWiiYx9rKTUa-r',raw:'S23E06 Season Finale.mp4'},
+        ]},
+        { label:'Season 24 — Pandemic Specials', fid:'1sF6h_wXr4Kt7IUByITty8R_ClalqbefB', episodes:[
+          {gdid:'1BsUkRvfwd1nuHPFTMhbFn_VUzCHIbAlt',raw:'S24E01 The Pandemic Special.mp4'},
+          {gdid:'1xJcXu-u79kVV5-XAL6TE-UVHqcsa80sf',raw:'S24E02 South ParQ Vaccination Special.mp4'},
+        ]},
+        { label:'Season 25', fid:'1_THvh8IdiPsnZ4g_zyYhCSntl-GJZ5DM', episodes:[
+          {gdid:'1Tsy6VIKg_NvFeAndpnSt5xldWDK3IZMP',raw:'S25E01 Pajama Day.mp4'},
+          {gdid:'18qOZZbHsJd7Ouohy7t9isI5rKqDiL-Mv',raw:'S25E02 The Big Fix.mp4'},
+          {gdid:'1OZ8YJNecl5UquVNH9QBK3ENB_n7nCQO2',raw:'S25E03 City People.mp4'},
+          {gdid:'1uvHLntL_goBf2ycyJE8FqSD_UvnkBikr',raw:'S25E04 Back to the Cold War.mp4'},
+          {gdid:'18OwDE-erF_Wri9Tf_3mPOSF63VlMLYM0',raw:'S25E05 Help My Teenager Hates Me!.mp4'},
+          {gdid:'1TplfYJa90fatHS0uwpuV5uEKDfjcm2cw',raw:"S25E06 Credigree Weed St. Patrick's Day Special.mp4"},
+        ]},
+        { label:'Season 26', fid:'1t84h6L_016p1h7ToaC7WaBm9446_IG69', episodes:[
+          {gdid:'13ULEgd5eM5J29lK_kHVHpjohQswMdymr',raw:'S26E01 Cupid Ye.mp4'},
+          {gdid:'1qOZLz_WZvEW7hwy-n1WglP09qgIwWpi7',raw:'S26E02 The Worldwide Privacy Tour.mp4'},
+          {gdid:'1xW72JhKYzkEPn6zvfd-2OUAOqX0BHjCp',raw:'S26E03 Japanese Toilet.mp4'},
+          {gdid:'1Wkl4iCQJejHXffLlBc7VFKfUFibAOihB',raw:'S26E04 Deep Learning.mp4'},
+          {gdid:'1AEVPMTDgShkirEOBZIwwqPxrfTRVTq9n',raw:'S26E05 DikinBaus Hot Dogs.mp4'},
+          {gdid:'1VnJsyM5umbdRn9O4ke6MqP0Q-cuSS0K5',raw:'S26E06 Spring Break.mp4'},
+        ]},
+        { label:'Specials & Movies', fid:'1xAfKKagBj4lhM0v9CTBvyqO4E4JcIPz0', episodes:[
+          {gdid:'1ORnPM6N0jZPFAPtrtfAOEWXW4joKIefW',raw:'South Park Bigger Longer and Uncut.mp4'},
+          {gdid:'1UpI8WPfDwizCpZG5BPeAHntOo-HIvLKJ',raw:'Post Covid.mkv'},
+          {gdid:'10bUkm3L7esH1XKXKwLgfqAhH6NPTuNOk',raw:'The Streaming Wars.mkv'},
+          {gdid:'16D10rvf-Z3_K8SyneS5amHfRRdhNnLfa',raw:'Joining the Panderverse.mkv'},
+          {gdid:'1ZrsVTfr34NStJLyKmiNZSTFIk9l4OeRh',raw:'Not Suitable for Children.mkv'},
+        ]},
+        { label:'Paramount+ Specials', fid:'1-HqHvhpoeUytEGWmhgvOK6HqevhCiAPY', episodes:[
+          {gdid:'1HlKhlN6C4wBSZO4SOzKXbJtkB8AghdKP',raw:'Into the Panderverse.mp4'},
+          {gdid:'1Hl9-Tmi-ckQ2xmwMBA-tF2oDQ_KPFgjl',raw:'Not Suitable for Children.mp4'},
+        ]},
+        { label:'Banned Episodes 🚫', fid:'1pL4kXchKXa0eawWFoCCgzYXv-mNX02D8', episodes:[
+          {gdid:'1pltA1Sun4H_x_5TfFEO2YCxw84kRJAEQ',raw:'S05E03 Super Best Friends (Banned).mp4'},
+          {gdid:'1g5zBdYToNcVmec2wVvsTVF7r4d4-Ig5q',raw:'S10E03 Cartoon Wars Part 1 (Banned).mp4'},
+          {gdid:'1MkVVT2JHQ7dg6ccL-BD7cXyqZTga1AHs',raw:'S10E04 Cartoon Wars Part 2 (Banned).mp4'},
+          {gdid:'13FcWYhuwVRZw1CEjmSR20IyzgXEUlOfX',raw:'S14E05 200 (Banned).mp4'},
+          {gdid:'1P7XouHgIDU5aoCK0KMiVkz_5eVmWWQhI',raw:'S14E06 201 (Banned).mp4'},
+        ]},
+      ]
+    },
+  ];
+
+  /* ── HELPERS ── */
+  function cleanTitle(raw) {
+    return raw
+      .replace(/\.(mp4|mkv|avi|mov)$/i,'')
+      .replace(/South\.Park\.\w+\d+\w+\d+\./i,'')
+      .replace(/South Park S\d+E\d+ /i,'')
+      .replace(/^S\d+E\d+ /i,'')
+      .replace(/\./g,' ')
+      .trim();
+  }
+  function epCode(raw, idx) {
+    const m = raw.match(/[Ss](\d+)[Ee](\d+)/);
+    if (m) return 'S'+m[1].padStart(2,'0')+'E'+m[2].padStart(2,'0');
+    return 'EP'+(idx+1).toString().padStart(2,'0');
+  }
+
+  /* ── STATE ── */
+  let activeShowId = null;
+  let currentEp = null;
+
+  /* ── BUILD SIDEBAR ── */
+  const sidebar = document.getElementById('sidebar');
+  SHOWS.forEach(show => {
+    const total = show.seasons.reduce((a,s)=>a+(s.zip?1:s.episodes.length),0);
+    const card = document.createElement('div');
+    card.className = 'show-card';
+    card.dataset.id = show.id;
+    card.innerHTML = `
+      <div class="show-emoji">${show.emoji}</div>
+      <div>
+        <div class="show-name">${show.name}</div>
+        <div class="show-eps">${show.seasons.length} seasons</div>
+      </div>`;
+    card.addEventListener('click', ()=>loadShow(show.id));
+    sidebar.appendChild(card);
+  });
+
+  /* ── LOAD SHOW ── */
+  function loadShow(id) {
+    activeShowId = id;
+    document.querySelectorAll('.show-card').forEach(c=>{
+      c.classList.toggle('active', c.dataset.id === id);
+    });
+    const show = SHOWS.find(s=>s.id===id);
+    if (!show) return;
+    renderEpisodes(show);
+  }
+
+  /* ── RENDER EPISODE LIST ── */
+  function renderEpisodes(show, filter='') {
+    const sec = document.getElementById('episodes-section');
+    sec.innerHTML = '';
+    filter = filter.toLowerCase();
+
+    show.seasons.forEach((season, si) => {
+      const hdr = document.createElement('div');
+      hdr.className = 'season-header';
+      hdr.innerHTML = `
+        <span class="season-arrow">▼</span>
+        <span class="season-label">${season.label}</span>
+        <span class="season-count">${season.zip ? '📦' : season.episodes.length + ' eps'}</span>`;
+
+      const epsWrap = document.createElement('div');
+      epsWrap.className = 'season-eps';
+
+      if (season.zip) {
+        const zipEl = document.createElement('div');
+        zipEl.className = 'zip-item';
+        zipEl.innerHTML = `
+          <div class="zip-icon">📦</div>
+          <div>
+            <div class="zip-label">ZIP Download Available</div>
+            <div class="zip-sub">Open Google Drive folder to download</div>
+          </div>
+          <button class="zip-btn" onclick="window.open('https://drive.google.com/drive/folders/${season.fid}','_blank')">↓ Drive</button>`;
+        epsWrap.appendChild(zipEl);
+      } else {
+        season.episodes.forEach((ep, idx) => {
+          const title = cleanTitle(ep.raw);
+          const code  = epCode(ep.raw, idx);
+          if (filter && !title.toLowerCase().includes(filter) && !code.toLowerCase().includes(filter)) return;
+
+          const item = document.createElement('div');
+          item.className = 'ep-item';
+          item.dataset.gdid = ep.gdid;
+          item.innerHTML = `
+            <div class="ep-num">${code}</div>
+            <div class="ep-title">${title}</div>
+            <div class="ep-badge">▶</div>`;
+          item.addEventListener('click', ()=>playEp(ep, show.name, item, idx));
+          epsWrap.appendChild(item);
+        });
+      }
+
+      // collapse logic
+      let collapsed = false;
+      hdr.addEventListener('click', ()=>{
+        collapsed = !collapsed;
+        hdr.classList.toggle('collapsed', collapsed);
+        if (collapsed) {
+          epsWrap.style.maxHeight = '0';
+        } else {
+          epsWrap.style.maxHeight = epsWrap.scrollHeight + 'px';
+        }
+      });
+      // set initial maxHeight after render
+      requestAnimationFrame(()=>{
+        epsWrap.style.maxHeight = epsWrap.scrollHeight + 'px';
+      });
+
+      sec.appendChild(hdr);
+      sec.appendChild(epsWrap);
+    });
+  }
+
+  /* ── PLAY EPISODE ── */
+  function playEp(ep, showName, itemEl, idx) {
+    document.querySelectorAll('.ep-item').forEach(i=>i.classList.remove('playing'));
+    itemEl.classList.add('playing');
+    currentEp = ep;
+
+    const frame = document.getElementById('ep-player');
+    const ph    = document.getElementById('player-placeholder');
+    const info  = document.getElementById('player-info');
+
+    frame.src = `https://drive.google.com/file/d/${ep.gdid}/preview`;
+    frame.style.display = 'block';
+    ph.style.display    = 'none';
+    info.style.display  = 'block';
+
+    const code  = epCode(ep.raw, idx||0);
+    const title = cleanTitle(ep.raw);
+    document.getElementById('player-label').textContent = code + ' — ' + showName;
+    document.getElementById('player-title').textContent = title;
+    document.getElementById('player-meta').textContent  = 'Streaming via Google Drive';
+  }
+
+  /* ── SEARCH ── */
+  document.getElementById('epSearch').addEventListener('input', function() {
+    const show = SHOWS.find(s=>s.id===activeShowId);
+    if (show) renderEpisodes(show, this.value);
+  });
+
+  /* ── AUTO-LOAD FIRST SHOW ── */
+  if (SHOWS.length > 0) loadShow(SHOWS[0].id);
+  </script>
+</body>
+</html>
