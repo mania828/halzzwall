@@ -1,0 +1,31 @@
+:root {
+  /* Backgrounds */
+  --background-color: rgb(0, 0, 0);
+  --hover-background-color: rgba(180, 0, 255, 0.15);
+  --input-background-color: rgb(8, 8, 8);
+  --input-hover-background-color: rgba(8, 8, 8, 0.8);
+  --tab-bg-color: rgb(14, 14, 14);
+  --tab-active-bg-color: rgb(28, 28, 28);
+  --utility-background-color: rgb(10, 10, 10);
+  --dark-translucent-bg: rgba(20, 0, 40, 0.6);
+  --background-image: none;
+  --logo: url("/assets/imgs/logo.png");
+  /* Borders */
+  --border-color: rgba(180, 0, 255, 0.25);
+  /* Text */
+  --text-color: rgb(255, 255, 255);
+  --hover-text-color: rgba(255, 255, 255, 0.55);
+  --active-text-color: rgba(255, 255, 255, 0.9);
+  /* Measurements */
+  --tab-content-margin: 9px;
+  --searchbar-width: calc(100% - calc(2 * 36px));
+
+  /* Primary Colors - HALZZWALL deep violet */
+  --main-color: rgb(155, 0, 255);
+  --main-color-bright: rgb(190, 60, 255);
+  --muted: rgb(160, 140, 190);
+  --faded-main-color: rgba(155, 0, 255, 0.22);
+  --accent-glow: 0 0 18px rgba(155, 0, 255, 0.45), 0 0 40px rgba(155, 0, 255, 0.18);
+  --halzz-color: rgb(255, 255, 255);
+  --wall-color: rgb(155, 0, 255);
+}
