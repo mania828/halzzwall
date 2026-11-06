@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zaku's Lab 3D Model</title>
+<link rel="icon" href="images/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#120a1c; --card:rgba(34,20,58,.85); --line:#3a2560; --text:#f1eafc; --muted:#b3a3cc; --purple:#a66bff; --gold:#f5c542; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { background: radial-gradient(900px 600px at 50% 40%, #2a1645, var(--bg) 70%); color: var(--text); font: 15px/1.5 Inter, system-ui, sans-serif; }
+canvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
+.top { position: fixed; top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+.top > * { pointer-events: auto; }
+.title { font-weight: 800; font-size: 18px; }
+.title small { display: block; color: var(--muted); font-weight: 400; font-size: 13px; }
+.top a { color: var(--text); text-decoration: none; border: 1px solid var(--line); padding: 7px 14px; border-radius: 999px; background: var(--card); font-size: 14px; }
+.ui { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(720px, calc(100vw - 32px));
+  background: var(--card); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: grid; gap: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row > span { color: var(--muted); font-size: 13px; width: 46px; }
+button { background: #1a0f2b; color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font: 600 13px Inter, sans-serif; cursor: pointer; }
+button.on { background: var(--purple); border-color: var(--purple); color: #fff; }
+button.gold { background: var(--gold); border-color: var(--gold); color: #1a0f00; }
+.sw { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
+.sw.on { border-color: var(--gold); background-clip: padding-box; }
+.hint { position: fixed; top: 64px; left: 16px; color: var(--muted); font-size: 13px; }
+#loading { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loading">Building the model…</div>
+<div class="top">
+  <div class="title">Zaku's Lab Handheld <small>Fully built · 3D model</small></div>
+  <a href="index.html">← Store</a>
+</div>
+<div class="hint">Drag to spin · scroll or pinch to zoom</div>
+<div class="ui">
+  <div class="row"><span>Case</span>
+    <button data-case="solid" class="on">Solid</button>
+    <button data-case="clear">See-through</button>
+    <button data-case="off">No case</button>
+    <button id="explode">Explode</button>
+  </div>
+  <div class="row"><span>Color</span>
+    <button class="sw on" data-color="#f2f1ee" style="background:#f2f1ee" aria-label="White"></button>
+    <button class="sw" data-color="#3b1d63" style="background:#3b1d63" aria-label="Purple"></button>
+    <button class="sw" data-color="#1c1a22" style="background:#1c1a22" aria-label="Black"></button>
+    <button class="sw" data-color="#c9a227" style="background:#c9a227" aria-label="Gold"></button>
+    <button class="sw" data-color="#2f6f4f" style="background:#2f6f4f" aria-label="Green"></button>
+  </div>
+  <div class="row"><span>View</span>
+    <button data-view="front">Front</button>
+    <button data-view="back">Back</button>
+    <button data-view="side">Side</button>
+    <button id="spin" class="on">Auto-spin</button>
+    <button id="save" class="gold">Save picture</button>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
+
+// All sizes are in mm. Board coords (bx, by) match KiCad: 0..108 left->right, 0..52 top->bottom.
+// World: x = bx - 54, z = by - 26, y = up (front of the PCB faces +y).
+const PI = Math.PI;
+const canvas = document.getElementById("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(0x000000, 0);
+
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(80, 200, 140);
+const under = new THREE.DirectionalLight(0xffffff, 1.1);
+under.position.set(-60, -200, 120);
+scene.add(sun, under, new THREE.HemisphereLight(0xe0d4ff, 0x6a5a88, 0.6));
+
+const camera = new THREE.PerspectiveCamera(35, 1, 1, 3000);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.minDistance = 70;
+controls.maxDistance = 700;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.2;
+
+// ---------- helpers ----------
+const M = (color, roughness = 0.5, metalness = 0, extra = {}) =>
+  new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
+const mat = {
+  pcb: M(0x2a0d48, 0.5), gold: M(0xe0b24a, 0.28, 1), silver: M(0xd5d8de, 0.25, 1),
+  black: M(0x141418, 0.6), blackGloss: M(0x050507, 0.08, 0.2), blue: M(0x1d2f6e, 0.5),
+  devkit: M(0x16181f, 0.55), green: M(0x1f6b3a, 0.5), red: M(0xb3162d, 0.5), beige: M(0xd9c39a, 0.6),
+  rubber: M(0x0d0d10, 0.85), cap: M(0x6a2fd0, 0.45), led: M(0xff2a2a, 0.15, 0, { transparent: true, opacity: 0.85, emissive: 0x550000 }),
+};
+const caseMat = new THREE.MeshPhysicalMaterial({ color: 0xf2f1ee, roughness: 0.55, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.6 });
+const inlayMat = M(0x6a2fd0, 0.5);
+
+function at(mesh, bx, y, by) { mesh.position.set(bx - 54, y, by - 26); return mesh; }
+function box(w, h, d, m, bx, y, by) { return at(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m), bx, y, by); }
+function cylY(r, h, m, bx, y, by, seg = 32) { return at(new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), m), bx, y, by); }
+
+function rrPath(p, cx, cy, w, h, r) {
+  const x0 = cx - w / 2, x1 = cx + w / 2, y0 = cy - h / 2, y1 = cy + h / 2;
+  p.moveTo(x0 + r, y0); p.lineTo(x1 - r, y0); p.absarc(x1 - r, y0 + r, r, -PI / 2, 0, false);
+  p.lineTo(x1, y1 - r); p.absarc(x1 - r, y1 - r, r, 0, PI / 2, false);
+  p.lineTo(x0 + r, y1); p.absarc(x0 + r, y1 - r, r, PI / 2, PI, false);
+  p.lineTo(x0, y0 + r); p.absarc(x0 + r, y0 + r, r, PI, 1.5 * PI, false);
+  return p;
+}
+const rrShape = (cx, cy, w, h, r) => rrPath(new THREE.Shape(), cx, cy, w, h, r);
+const rrHole = (cx, cy, w, h, r) => rrPath(new THREE.Path(), cx, cy, w, h, r);
+function circHole(cx, cy, r) { const p = new THREE.Path(); p.absarc(cx, cy, r, 0, 2 * PI, true); return p; }
+const U = (bx) => bx - 54, V = (by) => by - 26;   // board -> shape coords
+
+// flat plate from a 2D shape, occupying world y0..y0+t (shape x -> world x, shape y -> world z)
+function plate(shape, y0, t, m, bevel = 0) {
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: t - 2 * bevel, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 4, curveSegments: 40,
+  });
+  const mesh = new THREE.Mesh(geo, m);
+  mesh.rotation.x = PI / 2;
+  mesh.position.y = y0 + t - bevel;
+  return mesh;
+}
+function flat(shape, y, m) {               // a single-sided decal lying flat at height y
+  const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape, 40), m);
+  mesh.rotation.x = PI / 2;
+  mesh.position.y = y;
+  return mesh;
+}
+const loadImg = (src) => new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = src; });
+
+// crop the white margin off a KiCad render so the texture is exactly the 108x52 board
+function cropBoard(img) {
+  const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+  const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  const dark = (x, y) => { const i = (y * c.width + x) * 4; return d[i] + d[i + 1] + d[i + 2] < 600; };
+  const my = c.height >> 1;
+  let l = 0; while (!dark(l, my)) l++;
+  let r = c.width - 1; while (!dark(r, my)) r--;
+  const cx = Math.round(l + (r - l) * 0.15);
+  let t = 0; while (!dark(cx, t)) t++;
+  let b = c.height - 1; while (!dark(cx, b)) b--;
+  const o = document.createElement("canvas"); o.width = r - l + 1; o.height = b - t + 1;
+  o.getContext("2d").drawImage(c, l, t, o.width, o.height, 0, 0, o.width, o.height);
+  return o;
+}
+function tintedLogo(img, w, color) {
+  const h = Math.round(w * 48 / 118);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+  g.drawImage(img, 0, 0, w, h);
+  g.globalCompositeOperation = "source-in"; g.fillStyle = color; g.fillRect(0, 0, w, h);
+  return c;
+}
+function canvasTex(c) { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+
+// ---------- the screen image (a simple menu) ----------
+function drawScreen(logo) {
+  const c = document.createElement("canvas"); c.width = 640; c.height = 480;
+  const g = c.getContext("2d");
+  g.fillStyle = "#0b0614"; g.fillRect(0, 0, 640, 480);
+  g.fillStyle = "#2a1450"; g.fillRect(0, 0, 640, 64);
+  g.drawImage(tintedLogo(logo, 118, "#f5c542"), 14, 8);
+  g.fillStyle = "#f1eafc"; g.font = "bold 26px Inter, sans-serif"; g.textAlign = "right"; g.fillText("Bruce", 540, 42);
+  g.strokeStyle = "#f1eafc"; g.lineWidth = 3; g.strokeRect(560, 24, 50, 22); g.fillStyle = "#7dff9a"; g.fillRect(564, 28, 34, 14);
+  const items = ["WiFi", "BLE", "RF", "NFC", "IR", "Config"];
+  const icons = {
+    WiFi(x, y) { for (let i = 1; i <= 3; i++) { g.beginPath(); g.arc(x, y + 20, i * 14, -PI * 0.78, -PI * 0.22); g.stroke(); } g.beginPath(); g.arc(x, y + 20, 4, 0, 2 * PI); g.fill(); },
+    BLE(x, y) { g.beginPath(); g.moveTo(x - 14, y - 18); g.lineTo(x + 14, y + 10); g.lineTo(x, y + 24); g.lineTo(x, y - 32); g.lineTo(x + 14, y - 18); g.lineTo(x - 14, y + 10); g.stroke(); },
+    RF(x, y) { g.beginPath(); for (let i = -40; i <= 40; i++) g.lineTo(x + i, y - 4 + 16 * Math.sin(i / 6)); g.stroke(); },
+    NFC(x, y) { for (let i = 1; i <= 3; i++) { g.beginPath(); g.arc(x - 14, y, i * 12, -PI / 3, PI / 3); g.stroke(); } },
+    IR(x, y) { g.beginPath(); g.arc(x - 16, y, 9, 0, 2 * PI); g.fill(); for (const a of [-0.5, 0, 0.5]) { g.beginPath(); g.moveTo(x, y + a * 30); g.lineTo(x + 26, y + a * 50); g.stroke(); } },
+    Config(x, y) { g.beginPath(); g.arc(x, y, 16, 0, 2 * PI); g.stroke(); for (let i = 0; i < 8; i++) { const a = i * PI / 4; g.beginPath(); g.moveTo(x + 18 * Math.cos(a), y + 18 * Math.sin(a)); g.lineTo(x + 26 * Math.cos(a), y + 26 * Math.sin(a)); g.stroke(); } },
+  };
+  items.forEach((name, i) => {
+    const col = i % 3, row = (i / 3) | 0, x = 22 + col * 206, y = 84 + row * 180;
+    g.fillStyle = i === 0 ? "#3b1d63" : "#1a0f2b"; g.fillRect(x, y, 186, 160);
+    g.strokeStyle = i === 0 ? "#f5c542" : "#3a2560"; g.lineWidth = i === 0 ? 5 : 2; g.strokeRect(x, y, 186, 160);
+    g.strokeStyle = g.fillStyle = i === 0 ? "#f5c542" : "#a66bff"; g.lineWidth = 5; g.lineCap = "round";
+    icons[name](x + 93, y + 62);
+    g.fillStyle = "#f1eafc"; g.font = "bold 26px Inter, sans-serif"; g.textAlign = "center"; g.fillText(name, x + 93, y + 140);
+  });
+  return c;
+}
+
+async function build() {
+  const [front, back, logo] = await Promise.all([loadImg("images/board-front.png"), loadImg("images/board-back.png"), loadImg("images/logo.svg")]);
+  const root = new THREE.Group(); scene.add(root);
+  const add = (...m) => root.add(...m);
+
+  // ===== PCB =====
+  const holes = [[4, 4], [104, 4], [4, 48], [104, 48]];
+  const boardShape = rrShape(0, 0, 108, 52, 6);
+  holes.forEach(([x, y]) => boardShape.holes.push(circHole(U(x), V(y), 1.6)));
+  add(plate(boardShape, -0.8, 1.6, mat.pcb));
+  for (const [img, y, mirror] of [[front, 0.82, false], [back, -0.82, true]]) {
+    const t = canvasTex(cropBoard(img));
+    t.repeat.set((mirror ? -1 : 1) / 108, -1 / 52); t.offset.set(0.5, 0.5);
+    add(flat(boardShape, y, new THREE.MeshStandardMaterial({ map: t, roughness: 0.45, side: THREE.DoubleSide })));
+  }
+
+  // ===== FRONT =====
+  add(box(2.54, 8.5, 8 * 2.54, mat.black, 5.5, 0.8 + 4.25, 21 + 3.5 * 2.54));           // J5 socket
+  add(box(60, 1.6, 36, mat.blue, 33, 10.1, 25));                                          // TFT module
+  add(box(46, 2.4, 35, mat.blackGloss, 37, 12.1, 25));                                     // glass
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(41, 30.8), new THREE.MeshBasicMaterial({ map: canvasTex(drawScreen(logo)), toneMapped: false }));
+  scr.rotation.x = -PI / 2; add(at(scr, 37, 13.32, 25));
+
+  const buttons = [[82, 14, 2.9], [74, 22, 2.9], [82, 22, 3.3], [90, 22, 2.9], [82, 30, 2.9], [98, 36, 3.1]];
+  const TOP = 18.2;                                                                         // outside of the case lid
+  for (const [x, y, r] of buttons) {
+    add(box(4.2, 1.6, 3.2, mat.black, x, 1.6, y));                                          // PTS810 switch
+    const h = TOP + 0.9 - 2.4;
+    const prof = [[0, 0], [r, 0], [r, h - 0.7], [r - 0.25, h - 0.2], [r - 0.8, h], [0, h]].map(([a, b]) => new THREE.Vector2(a, b));
+    add(at(new THREE.Mesh(new THREE.LatheGeometry(prof, 40), mat.cap), x, 2.4, y));        // cap through the lid
+  }
+  const r1 = cylY(1.2, 6.3, mat.beige, 90.1, 2.2, 4); r1.rotation.z = PI / 2; add(r1);   // R1
+  for (const dx of [-1.27, 1.27]) add(cylY(0.25, 9.2, mat.silver, 97.27 + dx, 5.4, 4, 8)); // LED legs
+  add(cylY(2.9, 1, mat.led, 97.27, 10.4, 4));
+  add(cylY(2.5, 5.8, mat.led, 97.27, 13.8, 4));
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(2.5, 32, 16, 0, 2 * PI, 0, PI / 2), mat.led);
+  add(at(dome, 97.27, 16.7, 4));
+  for (const dy of [-2.54, 0, 2.54]) add(cylY(0.25, 9, mat.silver, 104, 5.3, 13.04 + dy, 8)); // VS1838B
+  add(box(5.6, 7, 6.6, mat.black, 104, 13.3, 13.04));
+  add(at(new THREE.Mesh(new THREE.SphereGeometry(2.2, 32, 16, 0, 2 * PI, 0, PI / 2), mat.black), 104, 16.8, 13.04));
+
+  // CC1101 module (own SMA) taped under the board; antenna exits the slot in the case's top wall
+  const SMA_X = 52.5, SMA_Y = -6.6;
+  add(box(15, 1.6, 26, mat.green, SMA_X, -2.6, 14));                                       // module board
+  add(box(6, 1, 6, mat.black, SMA_X, -3.9, 12));                                           // CC1101 chip
+  add(box(6.4, 6.4, 3, mat.gold, SMA_X, SMA_Y, 2));                                        // SMA body
+  const barrel = cylY(3.1, 13, mat.gold, SMA_X, SMA_Y, -5.5); barrel.rotation.x = PI / 2; add(barrel);
+  const nut = cylY(4.2, 1.6, mat.gold, SMA_X, SMA_Y, -3.3, 6); nut.rotation.x = PI / 2; add(nut);
+  for (let i = 0; i < 8; i++) {                                                            // module's 2x4 header
+    add(box(2.4, 2.5, 2.4, mat.black, 53.5 + (i % 2) * 2.54, -4.6, 22 + (i >> 1) * 2.54));
+  }
+  // Dupont wires from the J3 socket to the module
+  const wireCols = [0x222222, 0xd03030, 0xf08c1a, 0xf2d21b, 0x2fa84f, 0x2f6fe0, 0x8a3fd6, 0xdddddd];
+  for (let i = 0; i < 8; i++) {
+    const jx = 10 + i * 2.54;
+    add(box(2.4, 14, 2.4, mat.black, jx, -9.3 - 7, 9));                                    // Dupont plug
+    const pts = [[jx, -23.3, 9], [jx + 6, -24, 10.5], [30 + i, -22, 11.5], [49 + i * 0.3, -18, 13],
+                 [53.5 + (i % 2) * 2.54, -9, 18], [53.5 + (i % 2) * 2.54, -5.8, 22 + (i >> 1) * 2.54]]
+      .map(([x, y, z]) => new THREE.Vector3(x - 54, y, z - 26));
+    add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, 0.7, 8), M(wireCols[i], 0.6)));
+  }
+  const ant = new THREE.Group(); ant.position.set(U(SMA_X), SMA_Y, V(-12));
+  const knurl = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 6, 24), mat.rubber); knurl.rotation.x = PI / 2; knurl.position.z = 1; ant.add(knurl);
+  const hinge = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 8, 24), mat.rubber); hinge.rotation.z = PI / 2; hinge.position.z = -3; ant.add(hinge);
+  const whip = new THREE.Group(); whip.position.z = -3; whip.rotation.x = -PI / 3; ant.add(whip);
+  const L = 88;
+  const wprof = [[0, 0], [3.6, 0], [4.4, 14], [3.6, 24], [3.2, L - 3], [2.2, L - 0.6], [0, L]].map(([a, b]) => new THREE.Vector2(a, b));
+  whip.add(new THREE.Mesh(new THREE.LatheGeometry(wprof, 32), mat.rubber));
+  add(ant);
+
+  // ===== BACK (modules hang under the board on 8.5 mm sockets) =====
+  const SOCK = -0.8 - 4.25, MOD = -0.8 - 8.5 - 0.8;
+  add(box(38.1, 8.5, 2.54, mat.black, 26.22, SOCK, 19), box(38.1, 8.5, 2.54, mat.black, 26.22, SOCK, 44.4)); // J2, J1
+  add(box(51, 1.6, 28, mat.devkit, 26.2, MOD, 31.7));                                     // ESP32 DevKit
+  add(box(25.5, 0.8, 18, mat.blue, 39, MOD - 1.2, 31.7));                                 // WROOM module
+  add(box(17.5, 2.4, 16, mat.silver, 35, MOD - 2.8, 31.7));                               // RF shield
+  add(box(7.5, 3.2, 9, mat.silver, 2.9, MOD - 2.4, 31.7));                                // USB-C
+  add(box(3.5, 1.4, 4, mat.black, 10, MOD - 1.5, 22.5), box(3.5, 1.4, 4, mat.black, 10, MOD - 1.5, 40.9));
+  add(box(20.32, 8.5, 2.54, mat.black, 18.89, SOCK, 9));                                  // J3 socket
+  add(box(10.16, 8.5, 2.54, mat.black, 77.81, SOCK, 9));                                  // J4
+  add(box(43, 1.6, 40.4, mat.red, 79.5, MOD, 26.2));                                      // PN532
+  {
+    const c = document.createElement("canvas"); c.width = 430; c.height = 404;
+    const g = c.getContext("2d"); g.strokeStyle = "#e0b24a"; g.lineWidth = 7;
+    for (let i = 0; i < 4; i++) { const k = 50 + i * 16; g.strokeRect(k + 40, k - 10, 430 - 2 * k - 40, 404 - 2 * k + 10); }
+    const coil = new THREE.Mesh(new THREE.PlaneGeometry(43, 40.4), new THREE.MeshStandardMaterial({ map: canvasTex(c), transparent: true, metalness: 0.8, roughness: 0.3 }));
+    coil.rotation.x = PI / 2; coil.scale.x = -1; add(at(coil, 79.5, MOD - 0.82, 26.2));
+  }
+
+  // ===== CASE =====
+  // The real printable case (same STL files as the 3D-print set, in assembled position)
+  const loader = new STLLoader();
+  const stl = async (name, m) => {
+    const g = await loader.loadAsync(`models/${name}.stl`);
+    g.rotateX(-PI / 2);                       // Blender Z-up -> three.js Y-up
+    return new THREE.Mesh(toCreasedNormals(g, PI / 6), m);
+  };
+  const topShell = new THREE.Group(), botShell = new THREE.Group();
+  const [tb, ti, bb, bi] = await Promise.all([
+    stl("top_body", caseMat), stl("top_inlay", inlayMat), stl("bottom_body", caseMat), stl("bottom_inlay", inlayMat)]);
+  topShell.add(tb, ti);
+  botShell.add(bb, bi);
+  const caseGroup = new THREE.Group(); caseGroup.add(topShell, botShell); add(caseGroup);
+
+  // ===== controls =====
+  let exploded = false;
+  const views = { front: [70, 170, 200], back: [-60, -170, 200], side: [230, 40, 30] };
+  let lastView = "front";
+  function fitDist() {                       // back far enough that the whole device + antenna fits
+    const v = THREE.MathUtils.degToRad(camera.fov) / 2;
+    const h = Math.atan(Math.tan(v) * camera.aspect);
+    return 105 / Math.sin(Math.min(v, h));
+  }
+  function view(name) {
+    lastView = name;
+    controls.target.set(5, 0, -14);
+    camera.position.set(...views[name]).normalize().multiplyScalar(fitDist()).add(controls.target);
+  }
+
+  const caseBtns = document.querySelectorAll("[data-case]");
+  caseBtns.forEach((b) => b.onclick = () => {
+    caseBtns.forEach((x) => x.classList.toggle("on", x === b));
+    const mode = b.dataset.case;
+    caseGroup.visible = mode !== "off";
+    const clear = mode === "clear";
+    caseMat.transparent = clear; caseMat.opacity = clear ? 0.28 : 1; caseMat.depthWrite = !clear;
+    caseMat.roughness = clear ? 0.1 : 0.55; caseMat.needsUpdate = true;
+  });
+  document.querySelectorAll(".sw").forEach((b) => b.onclick = () => {
+    document.querySelectorAll(".sw").forEach((x) => x.classList.toggle("on", x === b));
+    caseMat.color.set(b.dataset.color);
+  });
+  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => view(b.dataset.view));
+  const ex = document.getElementById("explode");
+  ex.onclick = () => { exploded = !exploded; ex.classList.toggle("on", exploded); };
+  const spin = document.getElementById("spin");
+  spin.onclick = () => { controls.autoRotate = !controls.autoRotate; spin.classList.toggle("on", controls.autoRotate); };
+  document.getElementById("save").onclick = () => {
+    renderer.render(scene, camera);
+    const a = document.createElement("a"); a.download = "zakus-lab-handheld.png"; a.href = canvas.toDataURL("image/png"); a.click();
+  };
+
+  function resize() {
+    const w = innerWidth, h = innerHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  addEventListener("resize", () => { resize(); view(lastView); }); resize(); view("front");
+  document.getElementById("loading").remove();
+
+  renderer.setAnimationLoop(() => {
+    const k = 0.12;
+    topShell.position.y += ((exploded ? 34 : 0) - topShell.position.y) * k;
+    botShell.position.y += ((exploded ? -34 : 0) - botShell.position.y) * k;
+    controls.update();
+    renderer.render(scene, camera);
+  });
+  window.__ready = true;
+}
+build().catch((e) => { document.getElementById("loading").textContent = "Couldn't load the model: " + e.message; console.error(e); });
+</script>
+</body>
+</html>

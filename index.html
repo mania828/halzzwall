@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zaku's Lab Handheld</title>
+<meta name="description" content="Zaku's Lab: a pocket ESP32 multi-tool with sub-GHz radio, NFC, IR and a color screen. Runs open-source Bruce firmware. $50.">
+<link rel="icon" href="images/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* ===================== EDIT THESE ===================== */
+/* (the shop settings are in the <script> at the bottom)  */
+:root {
+  --bg: #120a1c;
+  --bg-2: #1b1029;
+  --card: #22143a;
+  --line: #3a2560;
+  --text: #f1eafc;
+  --muted: #b3a3cc;
+  --purple: #a66bff;
+  --gold: #f5c542;
+  --radius: 16px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 Inter, system-ui, sans-serif;
+  overflow-x: hidden;
+}
+img { max-width: 100%; display: block; }
+a { color: var(--purple); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+.mono { font-family: "JetBrains Mono", monospace; }
+
+/* nav */
+nav {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(18, 10, 28, .85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 800; }
+.logo {
+  display: inline-block; background: currentColor;
+  -webkit-mask: url(images/logo.svg) no-repeat center / contain;
+          mask: url(images/logo.svg) no-repeat center / contain;
+  aspect-ratio: 118 / 48;
+}
+.brand .logo { height: 30px; color: var(--gold); }
+nav .links { display: flex; gap: 22px; align-items: center; }
+nav .links a { color: var(--muted); text-decoration: none; font-size: 15px; }
+nav .links a:hover { color: var(--text); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 26px; border-radius: 999px; border: 0; cursor: pointer;
+  font: 700 16px Inter, sans-serif; text-decoration: none;
+  background: var(--gold); color: #1a0f00;
+  transition: transform .15s, box-shadow .15s;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(245, 197, 66, .3); }
+.btn.small { padding: 9px 18px; font-size: 14px; }
+.btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+
+/* hero */
+.hero { padding: 72px 0 40px; position: relative; }
+.hero::before {
+  content: ""; position: absolute; inset: -200px 0 auto; height: 700px; z-index: -1;
+  background: radial-gradient(600px 400px at 70% 30%, rgba(166, 107, 255, .25), transparent 70%);
+}
+.hero .wrap { display: grid; grid-template-columns: 1fr 1.2fr; gap: 48px; align-items: center; }
+.tag { display: inline-block; font-size: 13px; color: var(--gold); border: 1px solid rgba(245, 197, 66, .4); padding: 4px 12px; border-radius: 999px; margin-bottom: 18px; }
+h1 { font-size: clamp(38px, 6vw, 62px); line-height: 1.05; margin: 0 0 18px; letter-spacing: -1.5px; }
+h1 span { color: var(--purple); }
+.lead { color: var(--muted); font-size: 18px; margin: 0 0 28px; max-width: 480px; }
+.price-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.price { font-size: 44px; font-weight: 800; }
+.price small { font-size: 15px; color: var(--muted); font-weight: 400; display: block; margin-top: -6px; }
+.hero-img { background: #fff; border-radius: 24px; padding: 18px; box-shadow: 0 30px 80px rgba(0, 0, 0, .5); transform: rotate(-2deg); }
+
+/* sections */
+section { padding: 70px 0; }
+h2 { font-size: clamp(28px, 4vw, 38px); margin: 0 0 10px; letter-spacing: -.5px; }
+.sub { color: var(--muted); margin: 0 0 36px; }
+
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+.card .ico { font-size: 28px; margin-bottom: 10px; }
+.card h3 { margin: 0 0 6px; font-size: 19px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+/* gallery */
+.gallery { background: var(--bg-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+.tabs button { background: var(--card); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 8px 18px; font: 600 14px Inter, sans-serif; cursor: pointer; }
+.tabs button.on { background: var(--purple); color: #fff; border-color: var(--purple); }
+.shot { background: #fff; border-radius: var(--radius); padding: 16px; }
+.note { color: var(--muted); font-size: 14px; margin-top: 12px; }
+
+/* specs */
+.specs { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+td { padding: 11px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td:first-child { color: var(--muted); width: 42%; padding-right: 12px; }
+ul.box { margin: 0; padding: 0; list-style: none; }
+ul.box li { padding: 11px 0 11px 30px; border-bottom: 1px solid var(--line); position: relative; }
+ul.box li::before { content: "✓"; position: absolute; left: 4px; color: var(--gold); font-weight: 800; }
+
+/* buy */
+.buy { text-align: center; }
+.buy .card { max-width: 520px; margin: 0 auto; padding: 36px 28px; }
+.buy .logo { height: 54px; color: var(--gold); margin: 0 auto 18px; display: block; }
+.buy .price { font-size: 56px; margin-bottom: 4px; }
+.qty { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; margin: 14px 0 22px; }
+.qty button { background: none; border: 0; color: var(--text); font-size: 20px; width: 44px; height: 42px; cursor: pointer; }
+.qty span { min-width: 34px; font-weight: 700; }
+.stock { font-size: 14px; color: var(--muted); margin-top: 14px; }
+.msg { display: none; margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: rgba(245, 197, 66, .12); border: 1px solid rgba(245, 197, 66, .4); font-size: 14px; text-align: left; }
+
+/* faq */
+details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; margin-bottom: 10px; }
+summary { font-weight: 600; cursor: pointer; }
+details p { color: var(--muted); margin: 10px 0 0; }
+
+footer { border-top: 1px solid var(--line); padding: 32px 0; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .hero .wrap, .specs { grid-template-columns: 1fr; }
+  .hero { padding-top: 40px; }
+  .hero-img { transform: none; }
+  .grid { grid-template-columns: 1fr 1fr; }
+  nav .links a:not(.btn) { display: none; }
+}
+@media (max-width: 560px) {
+  .grid { grid-template-columns: 1fr; }
+  section { padding: 50px 0; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><i class="logo" aria-label="Zaku's Lab"></i></a>
+    <div class="links">
+      <a href="model.html">3D view</a>
+      <a href="#features">Features</a>
+      <a href="#specs">Specs</a>
+      <a href="#faq">FAQ</a>
+      <a class="btn small" href="#buy">Buy · $50</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <div class="tag mono">// open-source pocket multi-tool</div>
+      <h1>Radio, NFC &amp; IR.<br><span>In your pocket.</span></h1>
+      <p class="lead">The Zaku's Lab Handheld is an ESP32-powered gadget for learning about the wireless world.
+        It has a sub-GHz radio with a screw-on antenna, an NFC reader, IR, and a 2" color screen.
+        It ships with the open-source <b>Bruce</b> firmware.</p>
+      <div class="price-row">
+        <div class="price">$50<small>+ shipping</small></div>
+        <a class="btn" href="#buy">Get yours →</a>
+        <a class="btn ghost" href="model.html">See it in 3D</a>
+      </div>
+    </div>
+    <div class="hero-img"><img src="images/board-front.png" alt="Front of the Zaku's Lab board with the screen area, D-pad buttons, IR LED and SMA antenna jack"></div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <h2>What it can do</h2>
+    <p class="sub">Six radios and sensors on one 108 × 52 mm board.</p>
+    <div class="grid">
+      <div class="card"><div class="ico">📡</div><h3>Sub-GHz radio</h3><p>CC1101 transceiver (300–928 MHz) with an SMA jack, so you can screw on any antenna.</p></div>
+      <div class="card"><div class="ico">💳</div><h3>NFC / RFID</h3><p>PN532 reader for 13.56 MHz cards and tags. Read and explore your own cards.</p></div>
+      <div class="card"><div class="ico">🔴</div><h3>Infrared</h3><p>IR LED plus a VS1838B receiver. Learn and replay TV and AC remote codes.</p></div>
+      <div class="card"><div class="ico">📶</div><h3>Wi-Fi + Bluetooth</h3><p>ESP32 dual-core chip with 2.4 GHz Wi-Fi and BLE tools built into Bruce.</p></div>
+      <div class="card"><div class="ico">🖥️</div><h3>2.0" color screen</h3><p>240 × 320 ST7789 TFT, plus a 5-way D-pad and a BACK button.</p></div>
+      <div class="card"><div class="ico">🧪</div><h3>Open &amp; hackable</h3><p>Bruce is open source, and so is the pin map. Flash new firmware over USB any time.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="gallery">
+  <div class="wrap">
+    <h2>The board</h2>
+    <p class="sub">Designed in KiCad and made at JLCPCB in purple, with the Zaku's Lab flask on the front.</p>
+    <div class="tabs" role="tablist">
+      <button class="on" data-img="images/board-front.png" data-alt="Front of the board">Front</button>
+      <button data-img="images/board-back.png" data-alt="Back of the board with ESP32, CC1101 and PN532 sockets">Back</button>
+    </div>
+    <div class="shot"><img id="shot" src="images/board-front.png" alt="Front of the board"></div>
+    <p class="note">Board render shown. The modules plug in on the back.</p>
+  </div>
+</section>
+
+<section id="specs">
+  <div class="wrap specs">
+    <div>
+      <h2>Specs</h2>
+      <table>
+        <tr><td>Brain</td><td>ESP32-WROOM-32 (DevKit V1, USB-C)</td></tr>
+        <tr><td>Sub-GHz</td><td>CC1101, 300–348 / 387–464 / 779–928 MHz</td></tr>
+        <tr><td>Antenna</td><td>SMA, screw-on</td></tr>
+        <tr><td>NFC</td><td>PN532, 13.56 MHz (I2C)</td></tr>
+        <tr><td>IR</td><td>940 nm LED TX + VS1838B RX</td></tr>
+        <tr><td>Screen</td><td>2.0" ST7789, 240 × 320, color</td></tr>
+        <tr><td>Controls</td><td>Up / Down / Left / Right / OK / Back</td></tr>
+        <tr><td>Size</td><td>108 × 52 mm, 4 × M3 mounting holes</td></tr>
+        <tr><td>Power</td><td>USB-C 5 V</td></tr>
+        <tr><td>Firmware</td><td>Bruce (open source, GPL)</td></tr>
+      </table>
+    </div>
+    <div>
+      <h2>In the box</h2>
+      <ul class="box">
+        <li>Assembled Zaku's Lab Handheld</li>
+        <li>Bruce firmware pre-flashed and tested</li>
+        <li>Screw-on SMA antenna</li>
+        <li>Pin map card / link to the setup guide</li>
+      </ul>
+      <p class="note">Every unit is hand-soldered and tested before it ships.</p>
+    </div>
+  </div>
+</section>
+
+<section id="buy" class="buy">
+  <div class="wrap">
+    <div class="card">
+      <i class="logo" aria-hidden="true"></i>
+      <h2>Zaku's Lab Handheld</h2>
+      <div class="price"><span id="total">$50</span></div>
+      <div class="mono" style="color:var(--muted);font-size:14px;margin-bottom:22px">+ shipping · choose quantity at checkout</div>
+      <button class="btn" id="buyBtn">Buy now</button>
+      <div class="stock" id="stock"></div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>FAQ</h2>
+    <p class="sub">Good to know before you buy.</p>
+    <details><summary>Do I need to know how to code?</summary><p>No. It comes flashed with Bruce, so you plug it in over USB-C and it's ready to use. You can flash updates later from the Bruce web flasher.</p></details>
+    <details><summary>Does it come with a battery?</summary><p>No. It runs from USB-C power, so a phone power bank works great.</p></details>
+    <details><summary>How long does shipping take?</summary><p>Each unit is built by hand. Please allow time for it to be assembled and tested before it ships. You'll get a message when yours is on the way.</p></details>
+    <details><summary>Is this legal to use?</summary><p>Yes, for learning and testing on things <b>you own or have permission to test</b>. Don't use it to transmit on frequencies you aren't allowed to use, to jam signals, or to access other people's devices, cards or networks. Follow your local laws (in the US, the FCC rules). By buying, you agree to use it responsibly.</p></details>
+    <details><summary>Can I return it?</summary><p>If it arrives broken or doesn't work, contact us and we'll fix or replace it.</p></details>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>© <span id="yr"></span> Zaku's Lab. Built with KiCad + Bruce firmware.</div>
+    <div id="contact"></div>
+  </div>
+</footer>
+
+<script>
+/* ===================== SHOP SETTINGS: EDIT THESE ===================== */
+const SHOP = {
+  price: 50,
+  // Paste your Stripe Payment Link or PayPal link here, between the quotes,
+  // e.g. "https://buy.stripe.com/xxxx" or "https://www.paypal.com/ncp/payment/xxxx"
+  buyLink: "",
+  // Your shop email for questions (shows in the footer). Leave "" to hide it.
+  email: "",
+  // Units you have ready. Set to 0 to show "Sold out".
+  inStock: 5,
+};
+/* ===================================================================== */
+
+const $ = (id) => document.getElementById(id);
+$("yr").textContent = new Date().getFullYear();
+
+function render() {
+  $("total").textContent = "$" + SHOP.price;
+  if (SHOP.inStock <= 0) {
+    $("buyBtn").textContent = "Sold out";
+    $("buyBtn").disabled = true;
+    $("buyBtn").style.opacity = .5;
+    $("stock").textContent = "Check back soon. More are being built.";
+  } else {
+    $("stock").textContent = SHOP.inStock + " left in this batch";
+  }
+}
+
+$("buyBtn").onclick = () => {
+  if (SHOP.buyLink) {
+    window.location.href = SHOP.buyLink;
+  } else {
+    $("msg").style.display = "block";
+    $("msg").textContent = "Checkout isn't open yet. Check back soon!";
+  }
+};
+
+if (SHOP.email) {
+  const a = document.createElement("a");
+  a.href = "mailto:" + SHOP.email;
+  a.textContent = SHOP.email;
+  $("contact").append("Questions? ", a);
+}
+
+document.querySelectorAll(".tabs button").forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll(".tabs button").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+    $("shot").src = b.dataset.img;
+    $("shot").alt = b.dataset.alt;
+  };
+});
+render();
+</script>
+</body>
+</html>
