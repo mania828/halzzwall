@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#120A1C">
+<title>Zaku's Lab Link</title>
+<!--
+  Zaku's Lab Link (phone edition)
+  Controls the Zaku's Lab handheld (Bruce) over a USB cable, straight from the browser.
+  - Android: Chrome, with a USB-C OTG cable / adapter (uses WebUSB, drivers for CH34x, CP210x, FTDI, CDC built in).
+  - Computer: Chrome or Edge (uses Web Serial).
+  - iPhone / Safari / Firefox: not possible, they don't allow web pages to use USB.
+  The page must be served over HTTPS (or opened from localhost).
+-->
+<style>
+:root{--night:#120A1C;--panel:#1E1230;--panel2:#2A1A42;--purple:#A66BFF;--gold:#F5C542;--text:#EDE6F7;--dim:#9C8FB3;--bad:#FF6B8A;--good:#6BFFB0}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--night);color:var(--text);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+main{max-width:520px;margin:0 auto;padding:12px 16px calc(24px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;gap:10px;margin:4px 0 12px}
+header svg{width:30px;height:34px;flex:none}
+h1{font-size:17px;min-width:0;margin:0;color:var(--gold);font-weight:800;letter-spacing:.3px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--panel2);color:var(--dim);white-space:nowrap}
+.pill.on{background:#12382a;color:var(--good)}
+.pill.err{background:#3a1220;color:var(--bad)}
+.card{background:var(--panel);border-radius:16px;padding:12px;margin-bottom:12px}
+#screenWrap{position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:320/240;touch-action:none;user-select:none;-webkit-user-select:none}
+#screen{width:100%;height:100%;display:block;image-rendering:pixelated}
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px;background:rgba(18,10,28,.94);gap:8px}
+#overlay[hidden]{display:none}
+#overlay b{font-size:17px}
+.hint{color:var(--dim);font-size:13px}
+button{font:inherit;font-weight:650;color:var(--text);background:var(--panel2);border:0;border-radius:12px;padding:12px;cursor:pointer;touch-action:manipulation}
+button:active{background:var(--purple);color:var(--night)}
+button:disabled{opacity:.35;pointer-events:none}
+.primary{background:var(--purple);color:var(--night);padding:13px 24px;font-size:16px}
+.primary:active{background:var(--gold)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{height:58px;font-size:20px}
+.pad .sel{background:var(--purple);color:var(--night);font-size:15px}
+.pad .small{font-size:13px;color:var(--dim)}
+.row{display:flex;gap:8px;margin-top:8px}
+.row button{flex:1;min-width:0;padding:10px 4px;font-size:13px}
+label.sl{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--dim);margin-top:12px}
+input[type=range]{flex:1;accent-color:var(--purple)}
+#log{height:190px;overflow:auto;background:#0b0612;border-radius:10px;padding:8px;font:12px/1.35 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all;color:#cfc3e6;margin-top:10px}
+#log .me{color:var(--gold)}
+#log .bad{color:var(--bad)}
+.cmd{display:flex;gap:8px;margin-top:8px}
+.cmd input{flex:1;min-width:0;font:15px ui-monospace,Consolas,monospace;background:#0b0612;color:var(--text);border:1px solid var(--panel2);border-radius:10px;padding:10px}
+.cmd input:focus{outline:2px solid var(--purple);border-color:transparent}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chips button{padding:6px 11px;font-size:12px;border-radius:99px}
+details summary{cursor:pointer;color:var(--gold);font-weight:700}
+.foot{color:var(--dim);font-size:12px;text-align:center;margin-top:4px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg viewBox="0 0 10 12" aria-hidden="true" shape-rendering="crispEdges">
+      <path fill="#EDE6F7" d="M3 0h4v1H3zM3 1h1v4H3zM6 1h1v4H6zM2 5h1v2H2zM7 5h1v2H7zM1 7h1v3H1zM8 7h1v3H8zM2 10h6v1H2z"/>
+      <path fill="#2E0F59" d="M4 1h2v4H4zM3 5h4v2H3z"/>
+      <path fill="#A66BFF" d="M2 7h6v3H2z"/>
+    </svg>
+    <h1>Zaku's Lab Link</h1>
+    <span id="bat" class="pill" hidden></span>
+    <span id="status" class="pill">Offline</span>
+  </header>
+
+  <section class="card">
+    <div id="screenWrap">
+      <canvas id="screen" width="320" height="240"></canvas>
+      <div id="overlay">
+        <b id="ovTitle">Plug in your Zaku's Lab</b>
+        <span id="ovText" class="hint">Use a USB-C OTG cable or adapter, then tap Connect.</span>
+        <button id="connectBtn" class="primary">Connect</button>
+      </div>
+    </div>
+    <p class="hint" style="margin:8px 2px 0">Tap the screen = select. Swipe = move. Hold = back.</p>
+  </section>
+
+  <section class="card">
+    <div class="pad">
+      <button class="small" data-nav="prevpage">Pg ▲</button>
+      <button data-nav="up" aria-label="Up">▲</button>
+      <button class="small" data-nav="nextpage">Pg ▼</button>
+      <button data-nav="prev" aria-label="Previous">◀</button>
+      <button class="sel" data-nav="sel">OK</button>
+      <button data-nav="next" aria-label="Next">▶</button>
+      <button class="small" data-nav="esc">Back</button>
+      <button data-nav="down" aria-label="Down">▼</button>
+      <button class="small" id="shotBtn">Screenshot</button>
+    </div>
+    <label class="sl">Brightness <input id="bright" type="range" min="10" max="255" value="255"></label>
+    <div class="row">
+      <button data-cmd="clock">Clock</button>
+      <button data-cmd="zaku info">Refresh</button>
+      <button data-cmd="sleep" data-ask="Put the handheld to sleep?">Sleep</button>
+      <button data-cmd="reboot" data-ask="Reboot the handheld?">Reboot</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <details id="term">
+      <summary>Terminal</summary>
+      <div id="log"></div>
+      <form class="cmd" id="cmdForm" autocomplete="off">
+        <input id="cmdIn" placeholder="Bruce command, e.g. help" autocapitalize="off" spellcheck="false">
+        <button>Send</button>
+      </form>
+      <div class="chips">
+        <button data-cmd="help">help</button>
+        <button data-cmd="ls">ls</button>
+        <button data-cmd="free">free</button>
+        <button data-cmd="uptime">uptime</button>
+        <button data-cmd="info">info</button>
+        <button data-cmd="settings">settings</button>
+      </div>
+    </details>
+  </section>
+
+  <div class="row" style="margin:0 0 10px">
+    <button id="disconnectBtn" disabled>Disconnect</button>
+  </div>
+  <p class="foot">Works in Chrome on Android and Chrome/Edge on a computer. iPhones can't use USB from a web page.</p>
+</main>
+
+<script>
+"use strict";
+// USB-serial chips used on ESP32 boards. Anything else (a Flipper, a printer...) is never offered.
+const VIDS = [0x1A86, 0x10C4, 0x0403, 0x303A];
+const BAUD = 115200;
+const enc = new TextEncoder();
+const $ = id => document.getElementById(id);
+const isAndroid = /Android/i.test(navigator.userAgent);
+
+function concat(parts) {
+  let n = 0; for (const p of parts) n += p.length;
+  const out = new Uint8Array(n); let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+
+// ============================== USB links ==============================
+// Web Serial (Chrome/Edge on a computer)
+class SerialLink {
+  constructor(port) { this.port = port; this.closing = false; }
+  async open(onData) {
+    await this.port.open({ baudRate: BAUD, bufferSize: 65536 });
+    // keep EN and BOOT high: opening the port must not reset the ESP32
+    try { await this.port.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch (e) {}
+    this.writer = this.port.writable.getWriter();
+    this.loop(onData);
+  }
+  async loop(onData) {
+    while (this.port.readable && !this.closing) {
+      this.reader = this.port.readable.getReader();
+      try {
+        for (;;) { const { value, done } = await this.reader.read(); if (done) break; if (value) onData(value); }
+      } catch (e) {
+        if (!this.closing) { this.onLost && this.onLost(e); return; }
+      } finally { try { this.reader.releaseLock(); } catch (e) {} }
+    }
+    if (!this.closing) this.onLost && this.onLost();
+  }
+  write(bytes) { return this.writer.write(bytes); }
+  async close() {
+    this.closing = true;
+    try { await this.reader.cancel(); } catch (e) {}
+    try { this.writer.releaseLock(); } catch (e) {}
+    try { await this.port.close(); } catch (e) {}
+  }
+}
+
+// WebUSB (Chrome on Android): talks to the USB-serial chip directly.
+class UsbLink {
+  constructor(dev) { this.dev = dev; this.closing = false; }
+  vOut(req, value, index, data) {
+    return this.dev.controlTransferOut({ requestType: "vendor", recipient: "device", request: req, value, index }, data);
+  }
+  vIn(req, value, index, len) {
+    return this.dev.controlTransferIn({ requestType: "vendor", recipient: "device", request: req, value, index }, len);
+  }
+  async open(onData) {
+    const d = this.dev;
+    await d.open();
+    if (!d.configuration) await d.selectConfiguration(1);
+    let dataIf = null, commIf = null;
+    for (const itf of d.configuration.interfaces) {
+      const alt = itf.alternates[0];
+      if (alt.interfaceClass === 2 && commIf === null) commIf = itf.interfaceNumber;
+      const i = alt.endpoints.find(e => e.type === "bulk" && e.direction === "in");
+      const o = alt.endpoints.find(e => e.type === "bulk" && e.direction === "out");
+      if (i && o && dataIf === null && (alt.interfaceClass === 10 || alt.interfaceClass === 255)) {
+        dataIf = itf.interfaceNumber; this.epIn = i; this.epOut = o;
+      }
+    }
+    if (dataIf === null) throw new Error("This USB device has no serial port");
+    const vid = d.vendorId;
+    this.kind = vid === 0x1A86 ? "ch34x" : vid === 0x10C4 ? "cp210x" : vid === 0x0403 ? "ftdi" : "cdc";
+    this.ifn = dataIf; this.commIf = commIf;
+    if (this.kind === "cdc" && commIf !== null) await d.claimInterface(commIf);
+    await d.claimInterface(dataIf);
+    await this["init_" + this.kind]();
+    this.loop(onData);
+  }
+  async init_ch34x() {
+    const baud = async () => { await this.vOut(0x9A, 0x1312, 0xCC03); await this.vOut(0x9A, 0x0F2C, 0x0008); }; // 115200
+    await this.vIn(0x5F, 0, 0, 2);
+    await this.vOut(0xA1, 0, 0);
+    await baud();
+    await this.vIn(0x95, 0x2518, 0, 2);
+    await this.vOut(0x9A, 0x2518, 0x00C3);   // 8N1, RX + TX on
+    await this.vIn(0x95, 0x0706, 0, 2);
+    await this.vOut(0xA1, 0x501F, 0xD90A);
+    await baud();
+    await this.vOut(0xA4, 0xFF, 0);          // DTR + RTS off (inverted), so the ESP32 isn't reset
+  }
+  async init_cp210x() {
+    const o = (req, value, data) => this.dev.controlTransferOut(
+      { requestType: "vendor", recipient: "interface", request: req, value, index: this.ifn }, data);
+    await o(0x00, 0x0001);                   // enable
+    await o(0x03, 0x0800);                   // 8N1
+    const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, BAUD, true);
+    await o(0x1E, 0, b);                     // baud
+    await o(0x07, 0x0300);                   // DTR + RTS low
+  }
+  async init_ftdi() {
+    const idx = this.ifn + 1;
+    await this.vOut(0x00, 0, idx);           // reset
+    await this.vOut(0x01, 0x0300, idx);      // DTR + RTS low
+    await this.vOut(0x03, 0x001A, idx);      // 115200 (3 MHz / 26)
+    await this.vOut(0x04, 0x0008, idx);      // 8N1
+  }
+  async init_cdc() {
+    const idx = this.commIf !== null ? this.commIf : this.ifn;
+    const c = (req, value, data) => this.dev.controlTransferOut(
+      { requestType: "class", recipient: "interface", request: req, value, index: idx }, data);
+    const lc = new Uint8Array(7); new DataView(lc.buffer).setUint32(0, BAUD, true); lc[6] = 8;
+    try { await c(0x20, 0, lc); } catch (e) {}
+    try { await c(0x22, 0x01); } catch (e) {}  // DTR on, RTS off: output flows, no reset
+  }
+  async loop(onData) {
+    const ftdi = this.kind === "ftdi", ps = this.epIn.packetSize;
+    while (!this.closing) {
+      let r;
+      try { r = await this.dev.transferIn(this.epIn.endpointNumber, ftdi ? ps : 4096); }
+      catch (e) { if (!this.closing) this.onLost && this.onLost(e); return; }
+      if (r.status === "stall") { try { await this.dev.clearHalt("in", this.epIn.endpointNumber); } catch (e) {} continue; }
+      if (!r.data || !r.data.byteLength) continue;
+      let u = new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength);
+      if (ftdi) { // every FTDI packet starts with 2 status bytes
+        const parts = [];
+        for (let i = 0; i < u.length; i += ps) parts.push(u.subarray(i + 2, Math.min(i + ps, u.length)));
+        u = concat(parts);
+      }
+      if (u.length) onData(u.slice());
+    }
+  }
+  write(bytes) { return this.dev.transferOut(this.epOut.endpointNumber, bytes); }
+  async close() { this.closing = true; try { await this.dev.close(); } catch (e) {} }
+}
+
+// ============================== screen mirror ==============================
+// Bruce's tft_logger sends one packet per draw call:
+//   0xAA, size, function, then big-endian uint16 arguments (or text / an image path).
+// Text replies and logs are plain ASCII lines mixed into the same stream.
+const HEADER = 0xAA, SCREEN_INFO = 99;
+const F = { FILLSCREEN: 0, DRAWRECT: 1, FILLRECT: 2, DRAWROUNDRECT: 3, FILLROUNDRECT: 4, DRAWCIRCLE: 5,
+  FILLCIRCLE: 6, DRAWTRIANGLE: 7, FILLTRIANGLE: 8, DRAWELLIPSE: 9, FILLELLIPSE: 10, DRAWLINE: 11, DRAWARC: 12,
+  DRAWWIDELINE: 13, DRAWCENTRESTRING: 14, DRAWRIGHTSTRING: 15, DRAWSTRING: 16, PRINT: 17, DRAWIMAGE: 18,
+  DRAWPIXEL: 19, DRAWFASTVLINE: 20, DRAWFASTHLINE: 21 };
+const FIXED_ARGS = { 0: 1, 1: 5, 2: 5, 3: 6, 4: 6, 5: 4, 6: 4, 7: 7, 8: 7, 9: 5, 10: 5, 11: 5, 12: 8, 13: 7, 19: 3, 20: 4, 21: 4 };
+const TEXT_FUNCS = [14, 15, 16, 17];
+
+function validSize(fn, size) {
+  if (fn in FIXED_ARGS) return size === 3 + 2 * FIXED_ARGS[fn];
+  if (TEXT_FUNCS.includes(fn)) return size >= 13 && size <= 128;
+  if (fn === F.DRAWIMAGE) return size > 12 && size <= 128;
+  if (fn === SCREEN_INFO) return size === 8;
+  return false;
+}
+
+class Splitter {
+  constructor(onPacket, onLine) { this.buf = new Uint8Array(0); this.text = []; this.onPacket = onPacket; this.onLine = onLine; }
+  feed(data) {
+    const buf = this.buf.length ? concat([this.buf, data]) : data;
+    const n = buf.length; let i = 0;
+    while (i < n) {
+      const b = buf[i];
+      if (b === HEADER) {
+        if (n - i < 3) break;                       // wait for the size and function bytes
+        const size = buf[i + 1], fn = buf[i + 2];
+        if (validSize(fn, size)) {
+          if (n - i < size) break;                  // wait for the rest of the packet
+          this.onPacket(buf.slice(i, i + size));
+          i += size; continue;
+        }
+        i++; continue;                              // not a packet: skip the stray byte
+      }
+      if (b === 0x0A) {
+        const line = new TextDecoder().decode(Uint8Array.from(this.text)).replace(/\r$/, "");
+        this.text = [];
+        this.onLine(line);
+      } else if (this.text.length < 4096) this.text.push(b);
+      i++;
+    }
+    this.buf = buf.slice(i);
+  }
+}
+
+// 5x7 GLCD font used by TFT_eSPI text font 1 (Adafruit GFX, BSD license). 5 bytes per char, bit 0 = top row.
+const GLCD = (h => { const b = new Uint8Array(h.length / 2); for (let i = 0; i < b.length; i++) b[i] = parseInt(h.substr(i * 2, 2), 16); return b; })(
+"00000000003e5b4f5b3e3e6b4f6b3e1c3e7c3e1c183c7e3c181c577d571c1c5e7f5e1c00183c1800ffe7c3e7ff0018241800ffe7dbe7ff30483a060e2629792926407f050507407f05253f5a3ce73c5a7f3e1c1c08081c1c3e7f14227f22145f5f005f5f06097f017f006689956a606060606094a2ffa29408047e040810207e201008082a1c08081c2a08081e101010100c1e0c1e0c30383e3830060e3e0e06000000000000005f00000007000700147f147f14242a7f2a12231308646236495620500008070300001c2241000041221c002a1c7f1c2a08083e080800807030000808080808000060600020100804023e5149453e00427f400072494949462141494d331814127f1027454545393c4a49493141211109073649494936464949291e0000140000004034000000081422411414141414004122140802015909063e415d594e7c1211127c7f494949363e414141227f4141413e7f494949417f090909013e414151737f0808087f00417f41002040413f017f081422417f404040407f021c027f7f0408107f3e4141413e7f090909063e4151215e7f09192946264949493203017f01033f4040403f1f2040201f3f4038403f631408146303047804036159494d43007f4141410204081020004141417f04020102044040404040000307080020545478407f284444383844444428384444287f385454541800087e090218a4a49c787f0804047800447d40002040403d007f1028440000417f40007c047804787c080404783844444438fc1824241818242418fc7c08040408485454542404043f44243c4040207c1c2040201c3c4030403c44281028444c9090907c4464544c4400083641000000770000004136080002010204023c2623263c1ea1a161123a4040207a385454555921555579412154547841215554784020545579400c1e5272123955555559395454545939555454580000457c410002457d420001457c40f0292429f0f0282528f07c545545002054547c547c0a097f4932494949323248484832324a4848303a4141217a3a42402078009da0a07d39444444393d4040403d3c24ff2424487e4943662b2ffc2f2bff0929f620c0887e090320545479410000447d413048484a32384040227a007a0a0a727d0d19317d2629292f28262929292630484d4020380808080808080808382f10c8acba2f102834fa00007b000008142a142222142a14085500550055aa55aa55aaff55ff55ff000000ff00101010ff00141414ff001010ff00ff1010f010f0141414fc001414f700ff0000ff00ff1414f404fc141417101f10101f101f1414141f00101010f0000000001f101010101f10101010f010000000ff101010101010101010ff10000000ff140000ff00ff00001f10170000fc04f414141710171414f404f40000ff00f714141414141414f700f7141414171410101f101f141414f4141010f010f000001f101f0000001f14000000fc140000f010f01010ff10ff141414ff141010101f00000000f010fffffffffff0f0f0f0f0ffffff0000000000ffff0f0f0f0f0f38444438447c2a2a3e147e02020606027e027e0263554941633844443c04407e201e2006027e020299a5e7a5991c2a492a1c4c7201724c304a4d4d303048784830bc625a463d3e494949007e0101017e2a2a2a2a2a44445f444440514a444040444a51400000ff0103e080ff000008086b6b083612362436060f090f06000018180000001010003040ff0101001f01011e00191d1712003c3c3c3c0000000000");
+
+function col(c) {
+  c &= 0xFFFF;
+  return `rgb(${(((c >> 11) & 31) * 255 / 31) | 0},${(((c >> 5) & 63) * 255 / 63) | 0},${((c & 31) * 255 / 31) | 0})`;
+}
+
+class Screen {
+  constructor(canvas) { this.c = canvas; this.resize(320, 240); }
+  resize(w, h) {
+    this.w = w; this.h = h; this.c.width = w; this.c.height = h;
+    this.g = this.c.getContext("2d");
+    this.g.fillStyle = "#120A1C"; this.g.fillRect(0, 0, w, h);
+    $("screenWrap").style.aspectRatio = w + " / " + h;
+  }
+  text(codes, x, y, size, fg, bg) {
+    const g = this.g; size = Math.max(1, Math.min(size, 8));
+    const fgc = col(fg), bgc = col(bg);
+    let cx = x, cy = y;
+    for (let code of codes) {
+      if (code === 10) { cx = 0; cy += 8 * size; continue; }
+      if (cx + 6 * size > this.w && cx > 0) { cx = 0; cy += 8 * size; } // TFT_eSPI wraps to the left edge
+      if (fg !== bg) { g.fillStyle = bgc; g.fillRect(cx, cy, 6 * size, 8 * size); }
+      g.fillStyle = fgc;
+      for (let i = 0; i < 5; i++) {
+        const bits = GLCD[code * 5 + i];
+        for (let j = 0; j < 8; j++) if (bits >> j & 1) g.fillRect(cx + i * size, cy + j * size, size, size);
+      }
+      cx += 6 * size;
+    }
+  }
+  rrect(x, y, w, h, r) {
+    const g = this.g; g.beginPath();
+    g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  }
+  apply(p) {
+    const fn = p[2], a = [];
+    for (let k = 3; k + 1 < p.length; k += 2) { let v = (p[k] << 8) | p[k + 1]; if (v >= 0x8000) v -= 0x10000; a.push(v); }
+    const g = this.g;
+    g.lineWidth = 1; g.lineCap = "butt";
+    const paint = (c, fill) => { if (fill) { g.fillStyle = col(c); g.fill(); } else { g.strokeStyle = col(c); g.stroke(); } };
+    switch (fn) {
+      case SCREEN_INFO: {
+        const w = (p[3] << 8) | p[4], h = (p[5] << 8) | p[6];
+        if ((w !== this.w || h !== this.h) && w > 0 && w <= 800 && h > 0 && h <= 800) this.resize(w, h);
+        break;
+      }
+      case F.FILLSCREEN: g.fillStyle = col(a[0]); g.fillRect(0, 0, this.w, this.h); break;
+      case F.DRAWRECT: case F.FILLRECT: {
+        const [x, y, w, h, c] = a; if (w <= 0 || h <= 0) break;
+        if (fn === F.FILLRECT) { g.fillStyle = col(c); g.fillRect(x, y, w, h); }
+        else { g.strokeStyle = col(c); g.strokeRect(x + .5, y + .5, w - 1, h - 1); }
+        break;
+      }
+      case F.DRAWROUNDRECT: case F.FILLROUNDRECT: {
+        const [x, y, w, h, r0, c] = a; if (w <= 0 || h <= 0) break;
+        const r = Math.max(0, Math.min(r0, w / 2, h / 2));
+        if (fn === F.FILLROUNDRECT) this.rrect(x, y, w, h, r); else this.rrect(x + .5, y + .5, w - 1, h - 1, r);
+        paint(c, fn === F.FILLROUNDRECT); break;
+      }
+      case F.DRAWCIRCLE: case F.FILLCIRCLE: {
+        const [x, y, r, c] = a; g.beginPath();
+        g.arc(x + .5, y + .5, Math.max(0, fn === F.FILLCIRCLE ? r + .5 : r), 0, Math.PI * 2);
+        paint(c, fn === F.FILLCIRCLE); break;
+      }
+      case F.DRAWELLIPSE: case F.FILLELLIPSE: {
+        const [x, y, rx, ry, c] = a; g.beginPath();
+        g.ellipse(x + .5, y + .5, Math.max(0, rx), Math.max(0, ry), 0, 0, Math.PI * 2);
+        paint(c, fn === F.FILLELLIPSE); break;
+      }
+      case F.DRAWTRIANGLE: case F.FILLTRIANGLE: {
+        g.beginPath(); g.moveTo(a[0] + .5, a[1] + .5); g.lineTo(a[2] + .5, a[3] + .5); g.lineTo(a[4] + .5, a[5] + .5); g.closePath();
+        paint(a[6], fn === F.FILLTRIANGLE); break;
+      }
+      case F.DRAWLINE:
+        g.beginPath(); g.moveTo(a[0] + .5, a[1] + .5); g.lineTo(a[2] + .5, a[3] + .5); paint(a[4], false); break;
+      case F.DRAWFASTHLINE: g.fillStyle = col(a[3]); g.fillRect(a[0], a[1], a[2], 1); break;
+      case F.DRAWFASTVLINE: g.fillStyle = col(a[3]); g.fillRect(a[0], a[1], 1, a[2]); break;
+      case F.DRAWPIXEL: g.fillStyle = col(a[2]); g.fillRect(a[0], a[1], 1, 1); break;
+      case F.DRAWWIDELINE: {
+        const [ax, ay, bx, by, wd, fg] = a;
+        g.lineWidth = Math.max(1, wd); g.lineCap = "round";
+        g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); paint(fg, false); break;
+      }
+      case F.DRAWARC: {
+        // TFT_eSPI: 0 deg = 6 o'clock, clockwise. Canvas: 0 = 3 o'clock, clockwise.
+        const [x, y, r, ir, start, end, fg] = a;
+        g.lineWidth = Math.max(1, r - ir);
+        g.beginPath(); g.arc(x, y, (r + ir) / 2, (start + 90) * Math.PI / 180, (end + 90) * Math.PI / 180);
+        paint(fg, false); break;
+      }
+      case F.DRAWCENTRESTRING: case F.DRAWRIGHTSTRING: case F.DRAWSTRING: case F.PRINT: {
+        let [x, y, size, fg, bg] = a;
+        const codes = p.subarray(13);
+        const tw = codes.length * 6 * Math.max(1, Math.min(size, 8));
+        if (fn === F.DRAWCENTRESTRING) x -= Math.floor(tw / 2);
+        else if (fn === F.DRAWRIGHTSTRING) x -= tw;
+        this.text(codes, x, y, size, fg, bg); break;
+      }
+      case F.DRAWIMAGE: { // pictures live on the handheld's storage: show where one is
+        let [x, y] = a;
+        g.strokeStyle = "#A66BFF"; g.strokeRect(x + .5, y + .5, 47, 47);
+        this.text(enc.encode("img"), x + 15, y + 20, 1, 0xFFFF, 0xFFFF); break;
+      }
+    }
+  }
+}
+
+// ============================== app ==============================
+const screen = new Screen($("screen"));
+let link = null, writes = Promise.resolve(), dumpLines = null, info = {}, connecting = false;
+
+function log(text, cls) {
+  const box = $("log"), div = document.createElement("div");
+  div.textContent = text; if (cls) div.className = cls;
+  const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 4;
+  box.appendChild(div);
+  while (box.childNodes.length > 400) box.removeChild(box.firstChild);
+  if (atEnd) box.scrollTop = box.scrollHeight;
+}
+
+function setStatus(text, kind) {
+  const s = $("status"); s.textContent = text; s.className = "pill" + (kind ? " " + kind : "");
+}
+
+function overlay(show, title, text, btn) {
+  $("overlay").hidden = !show;
+  if (title) $("ovTitle").textContent = title;
+  if (text) $("ovText").textContent = text;
+  $("connectBtn").hidden = btn === false;
+}
+
+function onLine(line) {
+  line = line.trim();
+  if (dumpLines) {
+    if (line.startsWith("[End of Dump]")) {
+      const bytes = [];
+      for (const ln of dumpLines) for (const t of ln.split(/\s+/)) if (/^[0-9A-Fa-f]{2}$/.test(t)) bytes.push(parseInt(t, 16));
+      dumpLines = null;
+      new Splitter(p => screen.apply(p), () => {}).feed(Uint8Array.from(bytes));
+    } else dumpLines.push(line);
+    return;
+  }
+  if (line === "Binary Dump:") { dumpLines = []; return; }
+  if (line.startsWith("ZAKU {")) {
+    try { info = JSON.parse(line.slice(5)); showInfo(); } catch (e) {}
+  }
+  if (line) log(line);
+}
+
+const splitter = new Splitter(p => screen.apply(p), onLine);
+
+function showInfo() {
+  const b = $("bat"); b.hidden = false;
+  b.textContent = info.battery ? "🔋 " + info.battery + "%" : "USB power";
+  if (info.w && info.h && (info.w !== screen.w || info.h !== screen.h)) screen.resize(info.w, info.h);
+}
+
+function send(text, echo) {
+  if (!link) return;
+  if (echo) log("> " + text, "me");
+  const l = link;
+  writes = writes.then(() => l.write(enc.encode(text + "\n"))).catch(e => log("! " + e.message, "bad"));
+}
+
+function nav(cmd) {
+  if (!link) return;
+  if (navigator.vibrate) navigator.vibrate(8);
+  send("nav " + cmd);
+}
+
+async function start(newLink) {
+  link = newLink; connecting = true;
+  link.onLost = lost;
+  setStatus("Connecting…");
+  overlay(true, "Connecting…", "Talking to the handheld", false);
+  try {
+    await link.open(d => splitter.feed(d));
+  } catch (e) {
+    link = null; connecting = false;
+    const busy = /claim|access|busy|open/i.test(e.message || "");
+    setStatus("Failed", "err");
+    overlay(true, "Couldn't connect", busy ? "Another app is using the USB port. Close it and try again." : (e.message || String(e)));
+    return;
+  }
+  connecting = false;
+  setStatus("Connected", "on");
+  overlay(false);
+  $("disconnectBtn").disabled = false;
+  log("Connected (" + (link instanceof UsbLink ? "USB " + link.kind : "Web Serial") + ")", "me");
+  setTimeout(() => send("zaku info"), 300);
+  setTimeout(() => send("display dump"), 700);     // current screen first,
+  setTimeout(() => send("display start"), 1200);   // then live updates
+}
+
+async function connect() {
+  try {
+    const useUsb = "usb" in navigator && (isAndroid || !("serial" in navigator));
+    if (useUsb) {
+      const dev = await navigator.usb.requestDevice({ filters: VIDS.map(v => ({ vendorId: v })) });
+      await start(new UsbLink(dev));
+    } else {
+      const port = await navigator.serial.requestPort({ filters: VIDS.map(v => ({ usbVendorId: v })) });
+      await start(new SerialLink(port));
+    }
+  } catch (e) {
+    if (e.name === "NotFoundError") return; // the picker was closed
+    setStatus("Failed", "err");
+    overlay(true, "Couldn't connect", e.message || String(e));
+  }
+}
+
+function lost() {
+  if (!link) return;
+  link = null; dumpLines = null; writes = Promise.resolve();
+  setStatus("Unplugged", "err");
+  $("bat").hidden = true;
+  $("disconnectBtn").disabled = true;
+  overlay(true, "Plug in your Zaku's Lab", "The connection was lost. Plug it back in.");
+  log("Disconnected", "bad");
+}
+
+async function disconnect() {
+  if (!link) return;
+  const l = link;
+  send("display stop");
+  try { await writes; } catch (e) {}
+  link = null;
+  await l.close();
+  setStatus("Offline");
+  $("bat").hidden = true;
+  $("disconnectBtn").disabled = true;
+  overlay(true, "Plug in your Zaku's Lab", "Use a USB-C OTG cable or adapter, then tap Connect.");
+}
+
+// Reconnect by itself to a handheld this page was already allowed to use.
+async function autoConnect() {
+  if (link || connecting) return;
+  try {
+    const useUsb = "usb" in navigator && (isAndroid || !("serial" in navigator));
+    if (useUsb) {
+      const devs = (await navigator.usb.getDevices()).filter(d => VIDS.includes(d.vendorId));
+      if (devs.length) await start(new UsbLink(devs[0]));
+    } else if ("serial" in navigator) {
+      const ports = (await navigator.serial.getPorts()).filter(p => VIDS.includes(p.getInfo().usbVendorId));
+      if (ports.length) await start(new SerialLink(ports[0]));
+    }
+  } catch (e) {}
+}
+
+// ----- wiring -----
+if (!("usb" in navigator) && !("serial" in navigator)) {
+  const why = !window.isSecureContext ? "This page has to be opened over https://."
+    : "Open this page in Chrome on Android, or Chrome/Edge on a computer. iPhones and Firefox can't use USB from a web page.";
+  overlay(true, "This browser can't use USB", why, false);
+  setStatus("Not supported", "err");
+} else {
+  $("connectBtn").onclick = connect;
+  autoConnect();
+  if ("usb" in navigator) {
+    navigator.usb.addEventListener("connect", () => setTimeout(autoConnect, 600));
+    navigator.usb.addEventListener("disconnect", e => { if (link instanceof UsbLink && e.device === link.dev) lost(); });
+  }
+  if ("serial" in navigator) navigator.serial.addEventListener("connect", () => setTimeout(autoConnect, 600));
+}
+
+$("disconnectBtn").onclick = disconnect;
+document.querySelectorAll("[data-nav]").forEach(b => b.onclick = () => nav(b.dataset.nav));
+document.querySelectorAll("[data-cmd]").forEach(b => b.onclick = () => {
+  if (b.dataset.ask && !confirm(b.dataset.ask)) return;
+  send(b.dataset.cmd, true);
+});
+
+let brightTimer = 0;
+$("bright").oninput = e => {
+  clearTimeout(brightTimer);
+  brightTimer = setTimeout(() => send("screen brightness " + e.target.value), 150);
+};
+
+$("cmdForm").onsubmit = e => {
+  e.preventDefault();
+  const v = $("cmdIn").value.trim();
+  if (!v) return;
+  if (!link) { log("! Not connected", "bad"); return; }
+  send(v, true); $("cmdIn").value = "";
+};
+
+$("shotBtn").onclick = () => {
+  const k = 2, c = document.createElement("canvas");
+  c.width = screen.w * k; c.height = screen.h * k;
+  const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+  g.drawImage($("screen"), 0, 0, c.width, c.height);
+  c.toBlob(b => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b); a.download = "zakus-lab-screen.png"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }, "image/png");
+};
+
+// Touch the mirrored screen: tap = select, swipe = move, hold = back.
+(() => {
+  const el = $("screenWrap"); let sx = 0, sy = 0, st = 0, holdTimer = 0, held = false;
+  el.addEventListener("pointerdown", e => {
+    if (!link) return;
+    sx = e.clientX; sy = e.clientY; st = Date.now(); held = false;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => { held = true; nav("esc"); }, 600);
+  });
+  el.addEventListener("pointermove", e => {
+    if (Math.hypot(e.clientX - sx, e.clientY - sy) > 15) clearTimeout(holdTimer);
+  });
+  el.addEventListener("pointerup", e => {
+    clearTimeout(holdTimer);
+    if (!link || held || !st) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy; st = 0;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) nav("sel");
+    else if (Math.abs(dx) > Math.abs(dy)) nav(dx < 0 ? "next" : "prev");
+    else nav(dy < 0 ? "down" : "up");
+  });
+  el.addEventListener("pointercancel", () => { clearTimeout(holdTimer); st = 0; });
+})();
+
+// Keyboard (on a computer): arrows, Enter, Esc.
+document.addEventListener("keydown", e => {
+  if (!link || /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const k = { ArrowLeft: "prev", ArrowRight: "next", ArrowUp: "up", ArrowDown: "down", Enter: "sel", Escape: "esc", Backspace: "esc" }[e.key];
+  if (k) { e.preventDefault(); nav(k); }
+});
+
+// Battery refresh.
+setInterval(() => { if (link && !document.hidden) send("zaku info"); }, 15000);
+window.addEventListener("pagehide", () => { if (link) send("display stop"); });
+</script>
+</body>
+</html>
