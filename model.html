@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zaku's Lab 3D Model</title>
+<link rel="icon" href="images/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#120a1c; --card:rgba(34,20,58,.85); --line:#3a2560; --text:#f1eafc; --muted:#b3a3cc; --purple:#a66bff; --gold:#f5c542; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { background: radial-gradient(900px 600px at 50% 40%, #2a1645, var(--bg) 70%); color: var(--text); font: 15px/1.5 Inter, system-ui, sans-serif; }
+canvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
+.top { position: fixed; top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+.top > * { pointer-events: auto; }
+.title { font-weight: 800; font-size: 18px; }
+.title small { display: block; color: var(--muted); font-weight: 400; font-size: 13px; }
+.top a { color: var(--text); text-decoration: none; border: 1px solid var(--line); padding: 7px 14px; border-radius: 999px; background: var(--card); font-size: 14px; }
+.ui { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(720px, calc(100vw - 32px));
+  background: var(--card); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: grid; gap: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row > span { color: var(--muted); font-size: 13px; width: 46px; }
+button { background: #1a0f2b; color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font: 600 13px Inter, sans-serif; cursor: pointer; }
+button.on { background: var(--purple); border-color: var(--purple); color: #fff; }
+button.gold { background: var(--gold); border-color: var(--gold); color: #1a0f00; }
+.hint { position: fixed; top: 64px; left: 16px; color: var(--muted); font-size: 13px; }
+#loading { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loading">Building the model…</div>
+<div class="top">
+  <div class="title">Zaku's Lab Handheld <small>Rev C · 3D model, no case yet</small></div>
+  <a href="index.html">← Store</a>
+</div>
+<div class="hint">Drag to spin · scroll or pinch to zoom</div>
+<div class="ui">
+  <div class="row"><span>Show</span>
+    <button id="screenBtn" class="on">Screen</button>
+    <button id="modBtn" class="on">Modules</button>
+    <button id="explode">Explode</button>
+  </div>
+  <div class="row"><span>View</span>
+    <button data-view="front">Front</button>
+    <button data-view="back">Back</button>
+    <button data-view="side">Side</button>
+    <button id="spin" class="on">Auto-spin</button>
+    <button id="save" class="gold">Save picture</button>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+// All sizes are in mm. Board coords (bx, by) match KiCad: 0..116 left->right, 0..54 top->bottom.
+// World: x = bx - 58, z = by - 27, y = up (front of the PCB faces +y).
+const PI = Math.PI;
+const canvas = document.getElementById("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(0x000000, 0);
+
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(80, 200, 140);
+const under = new THREE.DirectionalLight(0xffffff, 1.1);
+under.position.set(-60, -200, 120);
+scene.add(sun, under, new THREE.HemisphereLight(0xe0d4ff, 0x6a5a88, 0.6));
+
+const camera = new THREE.PerspectiveCamera(35, 1, 1, 3000);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.minDistance = 70;
+controls.maxDistance = 700;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.2;
+
+// ---------- helpers ----------
+const M = (color, roughness = 0.5, metalness = 0, extra = {}) =>
+  new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
+const mat = {
+  pcb: M(0x2a0d48, 0.5), gold: M(0xe0b24a, 0.28, 1), silver: M(0xd5d8de, 0.25, 1),
+  black: M(0x141418, 0.6), blackGloss: M(0x050507, 0.08, 0.2), blue: M(0x1d2f6e, 0.5),
+  devkit: M(0x16181f, 0.55), green: M(0x1f6b3a, 0.5), red: M(0xb3162d, 0.5), beige: M(0xd9c39a, 0.6),
+  rubber: M(0x0d0d10, 0.85), cap: M(0x6a2fd0, 0.45), led: M(0xff2a2a, 0.15, 0, { transparent: true, opacity: 0.85, emissive: 0x550000 }),
+};
+
+function at(mesh, bx, y, by) { mesh.position.set(bx - 58, y, by - 27); return mesh; }
+function box(w, h, d, m, bx, y, by) { return at(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m), bx, y, by); }
+function cylY(r, h, m, bx, y, by, seg = 32) { return at(new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), m), bx, y, by); }
+
+function rrPath(p, cx, cy, w, h, r) {
+  const x0 = cx - w / 2, x1 = cx + w / 2, y0 = cy - h / 2, y1 = cy + h / 2;
+  p.moveTo(x0 + r, y0); p.lineTo(x1 - r, y0); p.absarc(x1 - r, y0 + r, r, -PI / 2, 0, false);
+  p.lineTo(x1, y1 - r); p.absarc(x1 - r, y1 - r, r, 0, PI / 2, false);
+  p.lineTo(x0 + r, y1); p.absarc(x0 + r, y1 - r, r, PI / 2, PI, false);
+  p.lineTo(x0, y0 + r); p.absarc(x0 + r, y0 + r, r, PI, 1.5 * PI, false);
+  return p;
+}
+const rrShape = (cx, cy, w, h, r) => rrPath(new THREE.Shape(), cx, cy, w, h, r);
+const rrHole = (cx, cy, w, h, r) => rrPath(new THREE.Path(), cx, cy, w, h, r);
+function circHole(cx, cy, r) { const p = new THREE.Path(); p.absarc(cx, cy, r, 0, 2 * PI, true); return p; }
+const U = (bx) => bx - 58, V = (by) => by - 27;   // board -> shape coords
+
+// flat plate from a 2D shape, occupying world y0..y0+t (shape x -> world x, shape y -> world z)
+function plate(shape, y0, t, m, bevel = 0) {
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: t - 2 * bevel, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 4, curveSegments: 40,
+  });
+  const mesh = new THREE.Mesh(geo, m);
+  mesh.rotation.x = PI / 2;
+  mesh.position.y = y0 + t - bevel;
+  return mesh;
+}
+function flat(shape, y, m) {               // a single-sided decal lying flat at height y
+  const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape, 40), m);
+  mesh.rotation.x = PI / 2;
+  mesh.position.y = y;
+  return mesh;
+}
+const loadImg = (src) => new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = src; });
+
+// crop the white margin off a KiCad render so the texture is exactly the 116x54 board
+function cropBoard(img) {
+  const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+  const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  const dark = (x, y) => { const i = (y * c.width + x) * 4; return d[i] + d[i + 1] + d[i + 2] < 600; };
+  const my = c.height >> 1;
+  let l = 0; while (!dark(l, my)) l++;
+  let r = c.width - 1; while (!dark(r, my)) r--;
+  const cx = Math.round(l + (r - l) * 0.15);
+  let t = 0; while (!dark(cx, t)) t++;
+  let b = c.height - 1; while (!dark(cx, b)) b--;
+  const o = document.createElement("canvas"); o.width = r - l + 1; o.height = b - t + 1;
+  o.getContext("2d").drawImage(c, l, t, o.width, o.height, 0, 0, o.width, o.height);
+  return o;
+}
+function toCanvas(img) {
+  const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+  c.getContext("2d").drawImage(img, 0, 0); return c;
+}
+function canvasTex(c) { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+
+// ---------- build ----------
+async function build() {
+  const [front, back, os] = await Promise.all([loadImg("images/board-front.png"), loadImg("images/board-back.png"), loadImg("images/os-home.png")]);
+  const osImg = toCanvas(os);
+  const root = new THREE.Group(); scene.add(root);
+  const add = (...m) => root.add(...m);
+
+  // ===== PCB =====
+  const holes = [[4, 4], [112, 4], [4, 50], [112, 50]];
+  const boardShape = rrShape(0, 0, 116, 54, 6);
+  holes.forEach(([x, y]) => boardShape.holes.push(circHole(U(x), V(y), 1.6)));
+  add(plate(boardShape, -0.8, 1.6, mat.pcb));
+  for (const [img, y, mirror] of [[front, 0.82, false], [back, -0.82, true]]) {
+    const t = canvasTex(cropBoard(img));
+    t.repeat.set((mirror ? -1 : 1) / 116, -1 / 54); t.offset.set(0.5, 0.5);
+    add(flat(boardShape, y, new THREE.MeshStandardMaterial({ map: t, roughness: 0.45, side: THREE.DoubleSide })));
+  }
+
+  // ===== FRONT =====
+  const screenG = new THREE.Group(), modG = new THREE.Group(); add(screenG, modG);
+  add(box(2.54, 8.5, 8 * 2.54, mat.black, 68.1, 0.8 + 4.25, 27));                         // J5 socket
+  screenG.add(box(61.5, 1.6, 37.5, mat.blue, 39.75, 10.1, 27));                            // TFT module
+  screenG.add(box(46, 2.4, 35, mat.blackGloss, 37, 12.1, 27));                             // glass
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(40.8, 30.6), new THREE.MeshBasicMaterial({ map: canvasTex(osImg), toneMapped: false }));
+  scr.rotation.x = -PI / 2; screenG.add(at(scr, 37, 13.32, 27));
+
+  for (const [x, y] of [[90, 16.5], [81, 25], [90, 25], [99, 25], [90, 33.5], [106, 41.5]]) {
+    add(box(4.2, 1.6, 3.2, mat.silver, x, 1.6, y));                                          // PTS810 switch
+    add(cylY(1.1, 0.9, mat.black, x, 2.8, y));
+  }
+  for (const y of [3.6, 7.4]) { const r = cylY(1.25, 6.3, mat.beige, 78.8, 2.2, y); r.rotation.z = PI / 2; add(r); }
+  for (const dx of [-1.27, 1.27]) add(cylY(0.25, 5, mat.silver, 96.77 + dx, 3.2, 4.2, 8)); // IR LED
+  add(cylY(2.9, 1, mat.led, 96.77, 6, 4.2));
+  add(cylY(2.5, 5.8, mat.led, 96.77, 9.4, 4.2));
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(2.5, 32, 16, 0, 2 * PI, 0, PI / 2), mat.led);
+  add(at(dome, 96.77, 12.3, 4.2));
+  for (const dy of [0, 2.54, 5.08]) add(cylY(0.25, 5, mat.silver, 112, 3.2, 12.5 + dy, 8)); // VS1838B
+  add(box(4.6, 7, 6.6, mat.black, 112, 9, 15.04));
+
+  // ===== BACK =====
+  // ESP32 DevKit, soldered straight in (USB-C at the left edge seen from the front)
+  const EY = 27.3, ESP = -0.8 - 2.5 - 0.8;
+  for (const y of [14.6, 40]) modG.add(box(38.1, 2.5, 2.54, mat.black, 26.22, -2.05, y));
+  modG.add(box(51, 1.6, 28.6, mat.devkit, 26.2, ESP, EY));
+  modG.add(box(25.5, 0.8, 18, mat.blue, 38.5, ESP - 1.2, EY));
+  modG.add(box(17.5, 2.4, 16, mat.silver, 35, ESP - 2.8, EY));
+  modG.add(box(7.5, 3.2, 9, mat.silver, 2.9, ESP - 2.4, EY));
+  modG.add(box(3.5, 1.4, 4, mat.black, 10, ESP - 1.5, EY - 9.2), box(3.5, 1.4, 4, mat.black, 10, ESP - 1.5, EY + 9.2));
+  // CC1101 with its own SMA, plugged into the 2x4 socket
+  const CCY = -0.8 - 8.5 - 2.5 - 0.8, CX = 58;
+  add(box(10.16, 8.5, 5.08, mat.black, CX, -5.05, 29.33));
+  modG.add(box(10.16, 2.5, 5.08, mat.black, CX, -10.55, 29.33));
+  modG.add(box(15, 1.6, 28, mat.devkit, CX, CCY, 20));
+  modG.add(box(4, 1, 4, mat.black, CX, CCY - 1.3, 21), box(6.4, 6.4, 3, mat.gold, CX, CCY, 6));
+  const barrel = cylY(3.1, 12, mat.gold, CX, CCY, 0); barrel.rotation.x = PI / 2; modG.add(barrel);
+  const ant = new THREE.Group(); ant.position.set(U(CX), CCY, V(-5)); modG.add(ant);
+  const wprof = [[0, 0], [4.2, 0], [4.2, 7], [3.6, 9], [4.4, 18], [3.6, 28], [3.2, 70], [2.2, 72], [0, 73]].map(([a, b]) => new THREE.Vector2(a, b));
+  const whip = new THREE.Mesh(new THREE.LatheGeometry(wprof, 32), mat.rubber); whip.rotation.x = -PI / 2; ant.add(whip);
+  // PN532
+  const MOD = -0.8 - 8.5 - 2.5 - 0.8;
+  add(box(10.16, 8.5, 2.54, mat.black, 90.8, -5.05, 9));
+  modG.add(box(10.16, 2.5, 2.54, mat.black, 90.8, -10.55, 9));
+  modG.add(box(43, 1.6, 40.4, mat.red, 92.5, MOD, 26.2));
+  {
+    const c = document.createElement("canvas"); c.width = 430; c.height = 404;
+    const g = c.getContext("2d"); g.strokeStyle = "#e0b24a"; g.lineWidth = 7;
+    for (let i = 0; i < 4; i++) { const k = 50 + i * 16; g.strokeRect(k + 40, k - 10, 430 - 2 * k - 40, 404 - 2 * k + 10); }
+    const coil = new THREE.Mesh(new THREE.PlaneGeometry(43, 40.4), new THREE.MeshStandardMaterial({ map: canvasTex(c), transparent: true, metalness: 0.8, roughness: 0.3 }));
+    coil.rotation.x = PI / 2; coil.scale.x = -1; modG.add(at(coil, 92.5, MOD - 0.82, 26.2));
+  }
+
+  // ===== controls =====
+  let exploded = false;
+  const views = { front: [70, 170, 200], back: [-60, -170, 200], side: [230, 40, 30] };
+  let lastView = "front";
+  function fitDist() {                       // back far enough that the whole device + antenna fits
+    const v = THREE.MathUtils.degToRad(camera.fov) / 2;
+    const h = Math.atan(Math.tan(v) * camera.aspect);
+    return 84 / Math.sin(Math.min(v, h));
+  }
+  function view(name) {
+    lastView = name;
+    controls.target.set(5, 0, -14);
+    camera.position.set(...views[name]).normalize().multiplyScalar(fitDist()).add(controls.target);
+  }
+
+  for (const [id, g] of [["screenBtn", screenG], ["modBtn", modG]]) {
+    const b = document.getElementById(id);
+    b.onclick = () => { g.visible = !g.visible; b.classList.toggle("on", g.visible); };
+  }
+  document.querySelectorAll("[data-view]").forEach((b) => b.onclick = () => view(b.dataset.view));
+  const ex = document.getElementById("explode");
+  ex.onclick = () => { exploded = !exploded; ex.classList.toggle("on", exploded); };
+  const spin = document.getElementById("spin");
+  spin.onclick = () => { controls.autoRotate = !controls.autoRotate; spin.classList.toggle("on", controls.autoRotate); };
+  document.getElementById("save").onclick = () => {
+    renderer.render(scene, camera);
+    const a = document.createElement("a"); a.download = "zakus-lab-handheld.png"; a.href = canvas.toDataURL("image/png"); a.click();
+  };
+
+  function resize() {
+    const w = innerWidth, h = innerHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  addEventListener("resize", () => { resize(); view(lastView); }); resize(); view("front");
+  document.getElementById("loading").remove();
+
+  renderer.setAnimationLoop(() => {
+    const k = 0.12;
+    screenG.position.y += ((exploded ? 34 : 0) - screenG.position.y) * k;
+    modG.position.y += ((exploded ? -34 : 0) - modG.position.y) * k;
+    controls.update();
+    renderer.render(scene, camera);
+  });
+  window.__ready = true;
+}
+build().catch((e) => { document.getElementById("loading").textContent = "Couldn't load the model: " + e.message; console.error(e); });
+</script>
+</body>
+</html>

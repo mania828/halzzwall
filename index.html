@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zaku's Lab Handheld</title>
+<meta name="description" content="Zaku's Lab: a pocket ESP32 multi-tool with sub-GHz radio, NFC, IR and a color screen. Runs Zaku OS. Coming soon.">
+<link rel="icon" href="images/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* ===================== EDIT THESE ===================== */
+/* (the shop settings are in the <script> at the bottom)  */
+:root {
+  --bg: #120a1c;
+  --bg-2: #1b1029;
+  --card: #22143a;
+  --line: #3a2560;
+  --text: #f1eafc;
+  --muted: #b3a3cc;
+  --purple: #a66bff;
+  --gold: #f5c542;
+  --radius: 16px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 Inter, system-ui, sans-serif;
+  overflow-x: clip;
+}
+img { max-width: 100%; display: block; }
+a { color: var(--purple); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+.mono { font-family: "JetBrains Mono", monospace; }
+
+/* nav */
+nav {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(18, 10, 28, .85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 800; }
+.logo {
+  display: inline-block; background: currentColor;
+  -webkit-mask: url(images/logo.svg) no-repeat center / contain;
+          mask: url(images/logo.svg) no-repeat center / contain;
+  aspect-ratio: 118 / 48;
+}
+.brand .logo { height: 30px; color: var(--gold); }
+nav .links { display: flex; gap: 22px; align-items: center; }
+nav .links a { color: var(--muted); text-decoration: none; font-size: 15px; }
+nav .links a:hover { color: var(--text); }
+nav .links a.btn, nav .links a.btn:hover { color: #1a0f00; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 26px; border-radius: 999px; border: 0; cursor: pointer;
+  font: 700 16px Inter, sans-serif; text-decoration: none;
+  background: var(--gold); color: #1a0f00;
+  transition: transform .15s, box-shadow .15s;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(245, 197, 66, .3); }
+.btn:disabled { opacity: .5; cursor: default; transform: none; box-shadow: none; }
+.btn.small { padding: 9px 18px; font-size: 14px; }
+.btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+
+/* hero */
+.hero { padding: 72px 0 40px; position: relative; }
+.hero::before {
+  content: ""; position: absolute; inset: -200px 0 auto; height: 700px; z-index: -1;
+  background: radial-gradient(600px 400px at 70% 30%, rgba(166, 107, 255, .25), transparent 70%);
+}
+.hero .wrap { display: grid; grid-template-columns: 1fr 1.2fr; gap: 48px; align-items: center; }
+.tag { display: inline-block; font-size: 13px; color: var(--gold); border: 1px solid rgba(245, 197, 66, .4); padding: 4px 12px; border-radius: 999px; margin-bottom: 18px; }
+h1 { font-size: clamp(38px, 6vw, 62px); line-height: 1.05; margin: 0 0 18px; letter-spacing: -1.5px; }
+h1 span { color: var(--purple); }
+.lead { color: var(--muted); font-size: 18px; margin: 0 0 28px; max-width: 480px; }
+.price-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.price { font-size: 44px; font-weight: 800; }
+.price small { font-size: 15px; color: var(--muted); font-weight: 400; display: block; margin-top: -6px; }
+.hero-img { background: #fff; border-radius: 24px; padding: 18px; box-shadow: 0 30px 80px rgba(0, 0, 0, .5); transform: rotate(-2deg); }
+
+/* sections */
+section { padding: 70px 0; scroll-margin-top: 64px; }
+h2 { font-size: clamp(28px, 4vw, 38px); margin: 0 0 10px; letter-spacing: -.5px; }
+.sub { color: var(--muted); margin: 0 0 36px; }
+
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+.card .ico { font-size: 28px; margin-bottom: 10px; }
+.card h3 { margin: 0 0 6px; font-size: 19px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+/* gallery */
+.gallery { background: var(--bg-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+.tabs button { background: var(--card); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 8px 18px; font: 600 14px Inter, sans-serif; cursor: pointer; }
+.tabs button.on { background: var(--purple); color: #fff; border-color: var(--purple); }
+.shot { background: #fff; border-radius: var(--radius); padding: 16px; }
+.note { color: var(--muted); font-size: 14px; margin-top: 12px; }
+
+.os { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.os img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+
+/* specs */
+.specs { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+td { padding: 11px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td:first-child { color: var(--muted); width: 42%; padding-right: 12px; }
+ul.box { margin: 0; padding: 0; list-style: none; }
+ul.box li { padding: 11px 0 11px 30px; border-bottom: 1px solid var(--line); position: relative; }
+ul.box li::before { content: "✓"; position: absolute; left: 4px; color: var(--gold); font-weight: 800; }
+
+/* buy */
+.buy { text-align: center; }
+.buy .card { max-width: 520px; margin: 0 auto; padding: 36px 28px; }
+.buy .logo { height: 54px; color: var(--gold); margin: 0 auto 18px; display: block; }
+.buy .price { font-size: 56px; margin-bottom: 4px; }
+.qty { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; margin: 14px 0 22px; }
+.qty button { background: none; border: 0; color: var(--text); font-size: 20px; width: 44px; height: 42px; cursor: pointer; }
+.qty span { min-width: 34px; font-weight: 700; }
+.stock { font-size: 14px; color: var(--muted); margin-top: 14px; }
+.msg { display: none; margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: rgba(245, 197, 66, .12); border: 1px solid rgba(245, 197, 66, .4); font-size: 14px; text-align: left; }
+
+/* faq */
+details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; margin-bottom: 10px; }
+summary { font-weight: 600; cursor: pointer; }
+details p { color: var(--muted); margin: 10px 0 0; }
+
+footer { border-top: 1px solid var(--line); padding: 32px 0; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .hero .wrap, .specs { grid-template-columns: 1fr; }
+  .hero { padding-top: 40px; }
+  .hero-img { transform: none; }
+  .grid { grid-template-columns: 1fr 1fr; }
+  nav .links a:not(.btn) { display: none; }
+}
+@media (max-width: 560px) {
+  .grid, .os { grid-template-columns: 1fr; }
+  section { padding: 50px 0; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><i class="logo" aria-label="Zaku's Lab"></i></a>
+    <div class="links">
+      <a href="model.html">3D view</a>
+      <a href="#features">Features</a>
+      <a href="#os">Zaku OS</a>
+      <a href="#specs">Specs</a>
+      <a href="#faq">FAQ</a>
+      <a class="btn small" href="#buy">Coming soon</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <div class="tag mono">// rev C · coming soon</div>
+      <h1>Radio, NFC &amp; IR.<br><span>In your pocket.</span></h1>
+      <p class="lead">The Zaku's Lab Handheld is an ESP32-powered gadget for learning about the wireless world.
+        It has a plug-in sub-GHz radio with a screw-on antenna, an NFC reader, infrared and a 2" color screen,
+        and it runs our own <b>Zaku OS</b>.</p>
+      <div class="price-row">
+        <div class="price">$50<small>planned price + shipping</small></div>
+        <a class="btn" href="#features">See the details →</a>
+        <a class="btn ghost" href="model.html">See it in 3D</a>
+      </div>
+    </div>
+    <div class="hero-img"><img src="images/board-front.png" alt="Front of the Zaku's Lab board with the screen outline, D-pad buttons, IR LED and Zaku's Lab logo"></div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <h2>What it's built to do</h2>
+    <p class="sub">Radio, NFC, infrared, Wi-Fi and Bluetooth on one 116 × 54 mm board.</p>
+    <div class="grid">
+      <div class="card"><h3>Infrared</h3><p>A built-in library of TV, projector and smart-board codes. Learn a button from your own remote, save it and send it again.</p></div>
+      <div class="card"><h3>Sub-GHz radio</h3><p>The CC1101 module plugs straight into the board, with its own screw-on antenna off the top edge. Signal meter, frequency analyzer, record and replay.</p></div>
+      <div class="card"><h3>NFC</h3><p>PN532 reader for 13.56 MHz cards and tags. There is no copper behind its antenna, which helps reading range.</p></div>
+      <div class="card"><h3>Wi-Fi and Bluetooth</h3><p>Scan nearby 2.4 GHz networks and Bluetooth LE devices and see their details.</p></div>
+      <div class="card"><h3>Control it from your phone</h3><p>Join the handheld's own Wi-Fi and open a page to see its screen live and press its buttons. No app needed, and it works on iPhone.</p></div>
+      <div class="card"><h3>2.0" color screen</h3><p>240 × 320 color screen facing out, with a D-pad, OK and BACK buttons.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="os" class="gallery">
+  <div class="wrap">
+    <h2>Zaku OS</h2>
+    <p class="sub">Our own firmware, written from scratch. Dark violet glass menus and six accent colors.</p>
+    <div class="os">
+      <img src="images/os-home.png" width="640" height="480" alt="Zaku OS home screen design">
+      <img src="images/os-menu.png" width="640" height="480" alt="Zaku OS menu design">
+    </div>
+    <p class="note">Design previews of Zaku OS 1.2.</p>
+  </div>
+</section>
+
+<section class="gallery">
+  <div class="wrap">
+    <h2>The board</h2>
+    <p class="sub">Rev C, designed in KiCad, with the Zaku's Lab flask on the front.</p>
+    <div class="tabs" role="tablist">
+      <button class="on" data-img="images/board-front.png" data-alt="Front of the board">Front</button>
+      <button data-img="images/board-back.png" data-alt="Back of the board with ESP32, CC1101 and PN532 sockets">Back</button>
+    </div>
+    <div class="shot"><img id="shot" src="images/board-front.png" alt="Front of the board"></div>
+    <p class="note">Computer render of the bare board. The screen goes on the front. The ESP32 and the CC1101 and PN532 modules go on the back.</p>
+  </div>
+</section>
+
+<section id="specs">
+  <div class="wrap specs">
+    <div>
+      <h2>Specs</h2>
+      <table>
+        <tr><td>Board</td><td>Rev C, 116 × 54 mm, 4 × M3 mounting holes</td></tr>
+        <tr><td>Brain</td><td>ESP32-WROOM-32 (30-pin DevKit, USB-C)</td></tr>
+        <tr><td>Sub-GHz</td><td>Plug-in CC1101, 300–348 / 387–464 / 779–928 MHz</td></tr>
+        <tr><td>Antenna</td><td>SMA, screw-on</td></tr>
+        <tr><td>NFC</td><td>PN532, 13.56 MHz (I2C)</td></tr>
+        <tr><td>IR</td><td>940 nm LED + VS1838B receiver</td></tr>
+        <tr><td>Screen</td><td>2.0" ST7789, 240 × 320, color</td></tr>
+        <tr><td>Controls</td><td>Up / Down / Left / Right / OK / Back</td></tr>
+        <tr><td>Power</td><td>USB-C 5 V, plus a header for adding a battery pack</td></tr>
+        <tr><td>Firmware</td><td>Zaku OS 1.2</td></tr>
+      </table>
+    </div>
+    <div>
+      <h2>Planned in the box</h2>
+      <ul class="box">
+        <li>Assembled Zaku's Lab Handheld</li>
+        <li>Zaku OS installed</li>
+        <li>Screw-on SMA antenna</li>
+        <li>Pin map and setup guide</li>
+      </ul>
+      <p class="note">Rev C is being prepared for its first boards. Nothing goes on sale until it has been built and tested. No case is included.</p>
+    </div>
+  </div>
+</section>
+
+<section id="buy" class="buy">
+  <div class="wrap">
+    <div class="card">
+      <i class="logo" aria-hidden="true"></i>
+      <h2>Zaku's Lab Handheld</h2>
+      <div class="price"><span id="total">$50</span></div>
+      <div class="mono" style="color:var(--muted);font-size:14px;margin-bottom:22px">planned price + shipping</div>
+      <button class="btn" id="buyBtn" disabled>Coming soon</button>
+      <div class="stock" id="stock"></div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>FAQ</h2>
+    <p class="sub">Good to know.</p>
+    <details><summary>When can I buy one?</summary><p>Not yet. The rev C board still has to be made, built and tested. The price is planned at $50 plus shipping.</p></details>
+    <details><summary>What changed in rev C?</summary><p>The screen is turned the right way out, the CC1101 plugs straight in with no wires, the NFC area has no copper behind it, and there is a header for adding battery power.</p></details>
+    <details><summary>Do I need to know how to code?</summary><p>No. Zaku OS will already be installed. Updates are flashed over USB-C.</p></details>
+    <details><summary>Does it come with a battery?</summary><p>No. It runs from USB-C, so a phone power bank works. The power header is for adding your own battery, charger and 5 V booster.</p></details>
+    <details><summary>Is there a case?</summary><p>Not yet. The earlier case doesn't fit rev C, so a new one comes after the board is tested.</p></details>
+    <details><summary>Is this legal to use?</summary><p>Only use it on things <b>you own or have permission to test</b>. Don't jam signals, transmit on frequencies you aren't allowed to use, or access other people's devices, cards or networks. Radio rules are different in each country, so check yours (in the US, the FCC rules).</p></details>
+    <details><summary>What if it arrives broken?</summary><p>Contact us and we'll fix or replace it.</p></details>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>© <span id="yr"></span> Zaku's Lab. Designed in KiCad, runs Zaku OS.</div>
+    <div id="contact"></div>
+  </div>
+</footer>
+
+<script>
+/* ===================== SHOP SETTINGS: EDIT THESE ===================== */
+const SHOP = {
+  price: 50,
+  // Paste your Stripe Payment Link or PayPal link here, between the quotes,
+  // e.g. "https://buy.stripe.com/xxxx" or "https://www.paypal.com/ncp/payment/xxxx"
+  buyLink: "",
+  // Your shop email for questions (shows in the footer). Leave "" to hide it.
+  email: "",
+  // Units you have ready. Set to 0 to show "Sold out".
+  inStock: 0,
+  // "soon" = Coming soon. Change to "open" once rev C is tested and you have units to sell.
+  status: "soon",
+};
+/* ===================================================================== */
+
+const $ = (id) => document.getElementById(id);
+$("yr").textContent = new Date().getFullYear();
+
+function render() {
+  $("total").textContent = "$" + SHOP.price;
+  const open = SHOP.status === "open" && SHOP.inStock > 0;
+  $("buyBtn").disabled = !open;
+  $("buyBtn").textContent = SHOP.status !== "open" ? "Coming soon" : open ? "Buy now" : "Sold out";
+  $("stock").textContent = SHOP.status !== "open" ? "Rev C goes on sale after it has been built and tested."
+    : open ? SHOP.inStock + " left in this batch" : "Check back soon. More are being built.";
+}
+
+$("buyBtn").onclick = () => {
+  if (SHOP.buyLink) {
+    window.location.href = SHOP.buyLink;
+  } else {
+    $("msg").style.display = "block";
+    $("msg").textContent = "Checkout isn't open yet. Check back soon!";
+  }
+};
+
+if (SHOP.email) {
+  const a = document.createElement("a");
+  a.href = "mailto:" + SHOP.email;
+  a.textContent = SHOP.email;
+  $("contact").append("Questions? ", a);
+}
+
+document.querySelectorAll(".tabs button").forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll(".tabs button").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+    $("shot").src = b.dataset.img;
+    $("shot").alt = b.dataset.alt;
+  };
+});
+render();
+</script>
+</body>
+</html>
